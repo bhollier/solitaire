@@ -4,7 +4,7 @@ use solitaire::*;
 #[test]
 fn test_game_rules_deal() -> Result<()> {
     Ok({
-        let deck: std::Deck = new_deck();
+        let deck: std::Deck = std::Card::new_deck();
         let mut game = std::GameState::new(&deck);
         std::GameRules::deal_mut(&mut game)?;
 

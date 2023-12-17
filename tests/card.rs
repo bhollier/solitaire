@@ -1,15 +1,19 @@
+use ::std::collections::HashSet;
 use solitaire::std;
 use solitaire::*;
 
 #[test]
 fn test_new_deck() {
-    let d: std::Deck = new_deck();
+    let d: std::Deck = std::Card::new_deck();
     assert_eq!(d.len(), 52);
+
+    let distinct_cards = d.iter().collect::<HashSet<_>>();
+    assert_eq!(distinct_cards.len(), 52);
 }
 
 #[test]
 fn test_take_n() {
-    let d: std::Deck = new_deck();
+    let d: std::Deck = std::Card::new_deck();
     {
         let (cs, rest) = take_n_slice(d.as_slice(), 10);
         assert_eq!(rest, &d[..42]);
@@ -32,7 +36,7 @@ fn test_take_n() {
 
 #[test]
 fn test_take_one() {
-    let d: std::Deck = new_deck();
+    let d: std::Deck = std::Card::new_deck();
     {
         let (c, rest) = take_one_slice(d.as_slice());
         assert_eq!(rest, &d[..51]);

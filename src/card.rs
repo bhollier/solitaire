@@ -1,59 +1,29 @@
 use rand;
 use rand::seq::SliceRandom;
-use std::cmp::Ordering;
-use std::slice::Iter;
+use std::hash::Hash;
 
-/// The Suit of a [Card], e.g. Clubs, Hearts, etc.
-pub trait Suit: Sized + Copy + Eq {
-    /// An iterator of all the valid [Suit]s a [Card] can have
-    fn iter() -> Iter<'static, Self>;
-}
-
-/// The Rank of a [Card]
-pub trait Rank: Sized + Copy + Eq + Ord {
-    /// An iterator of all the valid [Rank]s a [Card] can have
-    fn iter() -> Iter<'static, Self>;
-}
-
-/// A solitaire Card. Ord is implemented but only acts only on the card's [Rank]
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
-pub struct Card<S: Suit, R: Rank> {
-    pub suit: S,
-    pub rank: R,
-}
-
-impl<S: Suit, R: Rank> Ord for Card<S, R> {
-    fn cmp(&self, other: &Self) -> Ordering {
-        self.rank.cmp(&other.rank)
-    }
-}
-
-impl<S: Suit, R: Rank> PartialOrd<Self> for Card<S, R> {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        self.rank.partial_cmp(&other.rank)
-    }
+/// A solitaire Card. `N` is the total number of variations of Cards
+pub trait Card<const N: usize>: Copy + Clone + Eq + Ord + Hash {
+    /// Create a new (unshuffled) deck of Cards
+    fn new_deck() -> Deck<Self, N>;
 }
 
 /// A Deck of [Card]s
-pub type Deck<S, R> = Vec<Card<S, R>>;
+pub type Deck<C, const N: usize> = [C; N];
 
 /// A "Stack" of [Card] references, usually the [Card]s referencing the elements of a [Deck]
-pub type Stack<'a, S, R> = Vec<&'a Card<S, R>>;
-
-/// Creates a new deck of all the possible cards, using [Suit::iter] and [Rank::iter]
-pub fn new_deck<S: Suit + 'static, R: Rank + 'static>() -> Deck<S, R> {
-    S::iter()
-        .flat_map(|s| R::iter().map(|r| Card { suit: *s, rank: *r }))
-        .collect()
-}
+pub type Stack<'a, C> = Vec<&'a C>;
 
 /// Shuffles the given deck mutably, using [rand::thread_rng()]
-pub fn shuffle<S: Suit, R: Rank>(d: &mut Deck<S, R>) {
+pub fn shuffle<C: Card<N>, const N: usize>(d: &mut Deck<C, N>) {
     shuffle_with_rng(d, &mut rand::thread_rng())
 }
 
 /// Shuffles the given deck mutably, using the given [rand::Rng]
-pub fn shuffle_with_rng<S: Suit, R: Rank, RNG: rand::Rng>(d: &mut Deck<S, R>, r: &mut RNG) {
+pub fn shuffle_with_rng<C: Card<N>, const N: usize, RNG: rand::Rng>(
+    d: &mut Deck<C, N>,
+    r: &mut RNG,
+) {
     d.shuffle(r)
 }
 

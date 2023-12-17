@@ -8,3 +8,6 @@ edition = "2021"
 [dependencies]
 rand = "0.8.5"
 thiserror = "1.0.51"
+arr_macro = "0.2.1"
+strum = "0.25.0"
+strum_macros = "0.25.0"

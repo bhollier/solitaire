@@ -6,14 +6,14 @@ use thiserror;
 pub trait PileRef: Eq {}
 
 /// Trait for the state of a Solitaire game
-pub trait GameState<'a, S: Suit, R: Rank, P: PileRef>: Sized + Clone {
+pub trait GameState<'a, C: Card<N>, const N: usize, P: PileRef>: Sized + Clone {
     /// Creates a new game, using the given [Deck]
-    fn new(deck: &'a Deck<S, R>) -> Self;
+    fn new(deck: &'a Deck<C, N>) -> Self;
 
     /// Retrieve a reference to the [Stack] at the given [PileRef]
-    fn get_stack(&self, p: &P) -> Option<&Stack<'a, S, R>>;
+    fn get_stack(&self, p: &P) -> Option<&Stack<'a, C>>;
     /// Retrieve a mutable reference to the [Stack] at the given [PileRef]
-    fn get_stack_mut(&mut self, p: &P) -> Option<&mut Stack<'a, S, R>>;
+    fn get_stack_mut(&mut self, p: &P) -> Option<&mut Stack<'a, C>>;
 }
 
 /// Enum of all the possible errors that [GameRules] returns in a [Result]
@@ -34,18 +34,3 @@ pub enum Error {
 
 /// [`std::result::Result`] type for [Error]
 pub type Result<T> = std::result::Result<T, Error>;
-
-/// Trait for a Solitaire variant's rules
-pub trait GameRules<'a, GS: GameState<'a, S, R, P>, S: Suit, R: Rank, P: PileRef>: Sized {
-    /// Immutable version of [GameRules::deal_mut] which operates on a clone of the given [GameState]
-    fn deal(state: GS) -> Result<GS>;
-    /// Deals out the initial cards at the start of the game. 
-    /// If [Err] is returned then `state` should not be modified
-    fn deal_mut(state: &mut GS) -> Result<()>;
-
-    /// Immutable version of [GameRules::move_card] which operates on a clone of the given [GameState]
-    fn move_card(state: GS, src: P, take: usize, dst: P) -> Result<GS>;
-    /// Attempts to move `take` [Card]s from the stack at `src` and place them onto `dst`. 
-    /// If [Err] is returned then `state` is not modified
-    fn move_card_mut(state: &mut GS, src: P, take: usize, dst: P) -> Result<()>;
-}
