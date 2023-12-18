@@ -7,8 +7,8 @@ pub trait PileRef: Eq {}
 
 /// Trait for the state of a Solitaire game
 pub trait GameState<'a, C: Card<N>, const N: usize, P: PileRef>: Sized + Clone {
-    /// Creates a new game, using the given [Deck]
-    fn new(deck: &'a Deck<C, N>) -> Self;
+    /// Creates a new game, using the given [Deck] (or slice)
+    fn new(deck: &'a [C]) -> Self;
 
     /// Retrieve a reference to the [Stack] at the given [PileRef]
     fn get_stack(&self, p: &P) -> Option<&Stack<'a, C>>;
@@ -17,16 +17,19 @@ pub trait GameState<'a, C: Card<N>, const N: usize, P: PileRef>: Sized + Clone {
 }
 
 /// Enum of all the possible errors that [GameRules] returns in a [Result]
-#[derive(Debug, thiserror::Error)]
+#[derive(Debug, thiserror::Error, Eq, PartialEq)]
 pub enum Error {
     #[error("The given GameState was invalid")]
     InvalidState,
 
-    #[error("The given input {field:?} was invalid")]
-    InvalidInput { field: &'static str },
+    #[error("The given input {field:?} was invalid. Reason: {reason:?}")]
+    InvalidInput {
+        field: &'static str,
+        reason: &'static str,
+    },
 
-    #[error("Requested move was invalid")]
-    InvalidMove,
+    #[error("Requested move was invalid. Reason: {reason:?}")]
+    InvalidMove { reason: &'static str },
 
     #[error("An unknown error occurred")]
     Unknown,

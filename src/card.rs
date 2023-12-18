@@ -1,9 +1,10 @@
 use rand;
 use rand::seq::SliceRandom;
+use std::fmt::Display;
 use std::hash::Hash;
 
 /// A solitaire Card. `N` is the total number of variations of Cards
-pub trait Card<const N: usize>: Copy + Clone + Eq + Ord + Hash {
+pub trait Card<const N: usize>: Copy + Clone + Eq + Ord + Hash + Display {
     /// Create a new (unshuffled) deck of Cards
     fn new_deck() -> Deck<Self, N>;
 }
@@ -13,6 +14,22 @@ pub type Deck<C, const N: usize> = [C; N];
 
 /// A "Stack" of [Card] references, usually the [Card]s referencing the elements of a [Deck]
 pub type Stack<'a, C> = Vec<&'a C>;
+
+/// Trait extension for adding `from_*` functions to [Stack]
+pub trait StackFrom<C> {
+    /// Convenience function to create a [Stack] from a slice of `C` (usually a [Deck] or slice of [Card]).
+    /// Intended to be used to construct from a deck, as a stack usually contains reference to cards within a deck
+    fn from_slice(cs: &[C]) -> Stack<C> {
+        cs.iter().collect()
+    }
+
+    /// Convenience function to create a [Stack] from a [Vec<C>]
+    fn from_vec(cs: &Vec<C>) -> Stack<C> {
+        Self::from_slice(cs.as_slice())
+    }
+}
+
+impl<'a, C> StackFrom<C> for Stack<'a, C> {}
 
 /// Shuffles the given deck mutably, using [rand::thread_rng()]
 pub fn shuffle<C: Card<N>, const N: usize>(d: &mut Deck<C, N>) {
@@ -27,17 +44,17 @@ pub fn shuffle_with_rng<C: Card<N>, const N: usize, RNG: rand::Rng>(
     d.shuffle(r)
 }
 
-/// Returns two slices from the given slice, as a tuple of the `(taken, remaining)`
+/// Returns two slices from the given slice, as a tuple of the `(remaining, taken)`
 pub fn take_n_slice<T>(slice: &[T], n: usize) -> (&[T], &[T]) {
-    (&slice[slice.len() - n..], &slice[0..slice.len() - n])
+    (&slice[0..slice.len() - n], &slice[slice.len() - n..])
 }
 
-/// Creates two [Vec] from the given [Vec], as a tuple of the `(taken, remaining)`
+/// Creates two [Vec] from the given [Vec], as a tuple of the `(remaining, taken)`
 pub fn take_n_vec<'a, T>(cs: &Vec<&'a T>, n: usize) -> (Vec<&'a T>, Vec<&'a T>) {
-    let (cs, rest) = take_n_slice(cs.as_slice(), n);
+    let (rest, cs) = take_n_slice(cs.as_slice(), n);
     (
-        cs.iter().map(|c| *c).collect(),
         rest.iter().map(|c| *c).collect(),
+        cs.iter().map(|c| *c).collect(),
     )
 }
 
@@ -48,15 +65,15 @@ pub fn take_n_vec_mut<'a, T>(cs: &mut Vec<&'a T>, n: usize) -> Vec<&'a T> {
 }
 
 /// Returns the "top" card and a slice of the remaining elements as a tuple
-pub fn take_one_slice<T>(cs: &[T]) -> (&T, &[T]) {
-    let (cs, rest) = take_n_slice(cs, 1);
-    (&cs[0], rest)
+pub fn take_one_slice<T>(cs: &[T]) -> (&[T], &T) {
+    let (rest, cs) = take_n_slice(cs, 1);
+    (rest, &cs[0])
 }
 
 /// Returns the "top" card and a [Vec] of the remaining elements
-pub fn take_one_vec<'a, T>(cs: &Vec<&'a T>) -> (&'a T, Vec<&'a T>) {
-    let (cs, rest) = take_n_slice(cs.as_slice(), 1);
-    (cs[0], rest.iter().map(|c| *c).collect())
+pub fn take_one_vec<'a, T>(cs: &Vec<&'a T>) -> (Vec<&'a T>, &'a T) {
+    let (rest, cs) = take_n_slice(cs.as_slice(), 1);
+    (rest.iter().map(|c| *c).collect(), cs[0])
 }
 
 /// Returns the "top" card and removes the element from the given [Vec]

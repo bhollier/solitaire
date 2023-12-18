@@ -1,6 +1,6 @@
 use crate as solitaire;
 use arr_macro::arr;
-use std::cmp::Ordering;
+use std::*;
 use strum::EnumCount;
 use strum_macros::EnumCount as EnumCountMacro;
 
@@ -34,6 +34,17 @@ impl FrenchSuit {
             FrenchSuit::Spades => Color::Black,
             FrenchSuit::Hearts => Color::Red,
             FrenchSuit::Diamonds => Color::Red,
+        }
+    }
+}
+
+impl fmt::Display for FrenchSuit {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            FrenchSuit::Clubs => write!(f, "♣"),
+            FrenchSuit::Spades => write!(f, "♠"),
+            FrenchSuit::Hearts => write!(f, "♥"),
+            FrenchSuit::Diamonds => write!(f, "♦"),
         }
     }
 }
@@ -75,6 +86,26 @@ impl Rank {
     ];
 }
 
+impl fmt::Display for Rank {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Rank::King => write!(f, "K"),
+            Rank::Queen => write!(f, "Q"),
+            Rank::Jack => write!(f, "J"),
+            Rank::Ten => write!(f, "X"),
+            Rank::Nine => write!(f, "9"),
+            Rank::Eight => write!(f, "8"),
+            Rank::Seven => write!(f, "7"),
+            Rank::Six => write!(f, "6"),
+            Rank::Five => write!(f, "5"),
+            Rank::Four => write!(f, "4"),
+            Rank::Three => write!(f, "3"),
+            Rank::Two => write!(f, "2"),
+            Rank::Ace => write!(f, "A"),
+        }
+    }
+}
+
 /// A standard [Card](solitaire::Card) with a suit and a rank.
 /// Ord is implemented but only acts on the card's [Rank]
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
@@ -94,14 +125,20 @@ impl Card {
 }
 
 impl Ord for Card {
-    fn cmp(&self, other: &Self) -> Ordering {
+    fn cmp(&self, other: &Self) -> cmp::Ordering {
         self.rank.cmp(&other.rank)
     }
 }
 
 impl PartialOrd for Card {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+    fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
         self.rank.partial_cmp(&other.rank)
+    }
+}
+
+impl fmt::Display for Card {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}{}", self.rank, self.suit)
     }
 }
 
@@ -115,5 +152,5 @@ impl solitaire::Card<{ Card::N }> for Card {
 /// Convenience type alias for a [Deck](solitaire::Deck) of [Card]
 pub type Deck = solitaire::Deck<Card, { Card::N }>;
 
-/// Convenience type alias for a [Stack](solitaire::Stack) for [Card]
+/// Convenience type alias for a [Stack](solitaire::Stack) of [Card]
 pub type Stack<'a> = solitaire::Stack<'a, Card>;
