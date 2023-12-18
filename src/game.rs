@@ -16,7 +16,7 @@ pub trait GameState<'a, C: Card<N>, const N: usize, P: PileRef>: Sized + Clone {
     fn get_stack_mut(&mut self, p: &P) -> Option<&mut Stack<'a, C>>;
 }
 
-/// Enum of all the possible errors that [GameRules] returns in a [Result]
+/// Enum of all the possible errors that may occur while operating on a [GameState]
 #[derive(Debug, thiserror::Error, Eq, PartialEq)]
 pub enum Error {
     #[error("The given GameState was invalid")]

@@ -21,7 +21,8 @@ pub enum FrenchSuit {
 }
 
 impl FrenchSuit {
-    pub const VALUES: [FrenchSuit; FrenchSuit::COUNT] = [
+    pub const N: usize = <FrenchSuit as EnumCount>::COUNT;
+    pub const VALUES: [FrenchSuit; FrenchSuit::N] = [
         FrenchSuit::Clubs,
         FrenchSuit::Spades,
         FrenchSuit::Hearts,
@@ -49,8 +50,9 @@ impl fmt::Display for FrenchSuit {
     }
 }
 
-/// The standard Ranks of a cards, which is King, Queen, Jack, Ten to Two and Ace.
-/// [Ord] is defined according to this ordering, as this is how cards are ordered in a [Stack](solitaire::Stack)
+/// The standard Ranks of cards, which is King, Queen, Jack, Ten to Two and Ace.
+/// [Ord] is defined according to this ordering,
+/// as this is how cards are ordered in a [Stack](solitaire::Stack)
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, EnumCountMacro)]
 pub enum Rank {
     King,
@@ -69,7 +71,8 @@ pub enum Rank {
 }
 
 impl Rank {
-    pub const VALUES: [Rank; Rank::COUNT] = [
+    pub const N: usize = <Rank as EnumCount>::COUNT;
+    pub const VALUES: [Rank; Rank::N] = [
         Rank::King,
         Rank::Queen,
         Rank::Jack,
@@ -115,11 +118,11 @@ pub struct Card {
 }
 
 impl Card {
-    pub const N: usize = FrenchSuit::COUNT * Rank::COUNT;
+    pub const N: usize = FrenchSuit::N * Rank::N;
     fn from_index(i: usize) -> Card {
         Card {
-            suit: FrenchSuit::VALUES[i / Rank::COUNT],
-            rank: Rank::VALUES[i % Rank::COUNT],
+            suit: FrenchSuit::VALUES[i / Rank::N],
+            rank: Rank::VALUES[i % Rank::N],
         }
     }
 }

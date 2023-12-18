@@ -6,12 +6,12 @@ use crate::{
 use ::std::cmp;
 
 pub const NUM_TABLEAU: usize = 7;
-pub const NUM_FOUNDATIONS: usize = 4;
+pub const NUM_FOUNDATIONS: usize = std::FrenchSuit::N;
 
 /// "Standard" (Klondike) solitaire piles
 #[derive(Eq, PartialEq)]
 pub enum PileRef {
-    /// The "tableau" of 7 [Stack]s where cards are moved around
+    /// The "tableau" of [Stack]s where cards are moved around
     Tableau(usize),
 
     /// The "foundation" where cards of each suit are accumulated
@@ -30,6 +30,7 @@ pub enum PileRef {
 impl solitaire::PileRef for PileRef {}
 
 /// Struct for a [GameState](solitaire::GameState) containing the four piles in Klondike
+// todo make NUM_TABLEAU and NUM_FOUNDATIONS generic consts?
 #[derive(Clone)]
 pub struct GenericGameState<'a, C: Card<N>, const N: usize> {
     /// The tableau, see [Tableau](PileRef::Tableau)
