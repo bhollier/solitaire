@@ -6,7 +6,7 @@ use test_util::parse;
 #[test]
 fn test_game_rules_deal() {
     let deck: std::Deck = std::Card::new_deck();
-    let game = GameRules::new_and_deal(&deck);
+    let game = GameRules::deal(InitialGameState::from(deck));
 
     // Verify the cards were added to the tableau in the correct order
     let mut total_taken = 0;
@@ -14,14 +14,14 @@ fn test_game_rules_deal() {
         assert_eq!(stack.len(), i + 1);
         let mut index = i;
         for (j, card) in stack.iter().enumerate() {
-            assert_eq!(*card, &deck[deck.len() - index - 1]);
+            assert_eq!(card, &deck[deck.len() - index - 1]);
             index += NUM_TABLEAU - j - 1;
             total_taken += 1;
         }
     }
 
     // Verify the stock has the correct cards
-    let expected_stock: std::Stack = deck[0..deck.len() - total_taken].iter().collect();
+    let expected_stock: std::Stack = deck[0..deck.len() - total_taken].iter().cloned().collect();
     assert_eq!(game.stock, expected_stock);
 }
 
@@ -41,23 +41,17 @@ fn test_game_rules_draw_stock() -> Result<()> {
 
     game = GameRules::draw_stock(game, 1)?;
 
-    assert_eq!(game.stock, vec![&parse::card("KC")]);
-    assert_eq!(game.talon, vec![&parse::card("AH")]);
+    assert_eq!(game.stock, vec![parse::card("KC")]);
+    assert_eq!(game.talon, vec![parse::card("AH")]);
 
     game = GameRules::draw_stock(game, 1)?;
 
     assert!(game.stock.is_empty());
-    assert_eq!(
-        game.talon,
-        Stack::from_vec(&parse::cards(&vec!["AH", "KC"]))
-    );
+    assert_eq!(game.talon, parse::cards(&vec!["AH", "KC"]));
 
     game = GameRules::draw_stock(game, 1)?;
 
-    assert_eq!(
-        game.stock,
-        Stack::from_vec(&parse::cards(&vec!["KC", "AH"]))
-    );
+    assert_eq!(game.stock, parse::cards(&vec!["KC", "AH"]));
     assert!(game.talon.is_empty());
 
     Ok(())
@@ -69,22 +63,16 @@ fn test_game_rules_valid_seq_tableau() {
     let p = std::PileRef::Tableau(0);
 
     let valid = parse::cards(&vec!["KC", "QH", "JS", "XD"]);
-    assert!(GameRules::valid_seq(p, Stack::from_vec(&valid).as_slice()));
+    assert!(GameRules::valid_seq(p, valid.as_slice()));
 
-    let invalid_wrong_dir: Vec<&std::Card> = valid.iter().rev().collect();
+    let invalid_wrong_dir: Vec<std::Card> = valid.iter().rev().cloned().collect();
     assert!(!GameRules::valid_seq(p, invalid_wrong_dir.as_slice()));
 
     let invalid_same_color = parse::cards(&vec!["8H", "7D", "6D"]);
-    assert!(!GameRules::valid_seq(
-        p,
-        Stack::from_vec(&invalid_same_color).as_slice()
-    ));
+    assert!(!GameRules::valid_seq(p, invalid_same_color.as_slice()));
 
     let invalid_overflow = parse::cards(&vec!["2C", "AH", "KS"]);
-    assert!(!GameRules::valid_seq(
-        p,
-        Stack::from_vec(&invalid_overflow).as_slice()
-    ));
+    assert!(!GameRules::valid_seq(p, invalid_overflow.as_slice()));
 }
 
 /// Test the sequence validation on its own for a foundation pile
@@ -93,22 +81,16 @@ fn test_game_rules_valid_seq_foundation() {
     let p = std::PileRef::Foundation(0);
 
     let valid = parse::cards(&vec!["XC", "JC", "QC", "KC"]);
-    assert!(GameRules::valid_seq(p, Stack::from_vec(&valid).as_slice()));
+    assert!(GameRules::valid_seq(p, valid.as_slice()));
 
-    let invalid_wrong_dir: Vec<&std::Card> = valid.iter().rev().collect();
+    let invalid_wrong_dir: Vec<std::Card> = valid.iter().rev().cloned().collect();
     assert!(!GameRules::valid_seq(p, invalid_wrong_dir.as_slice()));
 
     let invalid_different_suit = parse::cards(&vec!["6D", "7D", "8H"]);
-    assert!(!GameRules::valid_seq(
-        p,
-        Stack::from_vec(&invalid_different_suit).as_slice()
-    ));
+    assert!(!GameRules::valid_seq(p, invalid_different_suit.as_slice()));
 
     let invalid_overflow = parse::cards(&vec!["QC", "KC", "AC"]);
-    assert!(!GameRules::valid_seq(
-        p,
-        Stack::from_vec(&invalid_overflow).as_slice()
-    ));
+    assert!(!GameRules::valid_seq(p, invalid_overflow.as_slice()));
 }
 
 /// Test basic input validation when moving cards,
@@ -116,8 +98,7 @@ fn test_game_rules_valid_seq_foundation() {
 /// or trying to move cards to the stock, etc.
 #[test]
 fn test_game_rules_move_cards_invalid_input() {
-    let deck = std::Card::new_deck();
-    let game = GameRules::new_and_deal(&deck);
+    let game = GameRules::new_and_deal();
 
     let pile = std::PileRef::Tableau(0);
 
@@ -206,8 +187,8 @@ fn test_game_rules_move_cards_invalid_move() -> Result<()> {
 
     let mut game = PlayingGameState {
         tableau: [
-            Stack::from_vec(&tableau0),
-            Stack::from_vec(&tableau1),
+            tableau0,
+            tableau1,
             Stack::new(),
             Stack::new(),
             Stack::new(),
@@ -307,8 +288,8 @@ fn test_game_rules_move_cards() -> Result<()> {
 
     let mut game = PlayingGameState {
         tableau: [
-            Stack::from_vec(&tableau0),
-            Stack::from_vec(&tableau1),
+            tableau0,
+            tableau1,
             Stack::new(),
             Stack::new(),
             Stack::new(),
@@ -332,10 +313,7 @@ fn test_game_rules_move_cards() -> Result<()> {
     // Talon is now empty
     assert!(game.talon.is_empty());
     // Tableau is 2 of Spades and Ace of Hearts
-    assert_eq!(
-        game.tableau[0],
-        Stack::from_vec(&parse::cards(&vec!["2S", "AH"]))
-    );
+    assert_eq!(game.tableau[0], parse::cards(&vec!["2S", "AH"]));
 
     // Move the stack to the second tableau with a 3 of Diamonds
     game = match GameRules::move_cards(game, std::PileRef::Tableau(0), 2, std::PileRef::Tableau(1))?
@@ -347,10 +325,7 @@ fn test_game_rules_move_cards() -> Result<()> {
     // First tableau is now empty
     assert!(game.tableau[0].is_empty());
     // Second tableau is the 3 of Diamonds, 2 of Spades and Ace of Hearts
-    assert_eq!(
-        game.tableau[1],
-        Stack::from_vec(&parse::cards(&vec!["3D", "2S", "AH"]))
-    );
+    assert_eq!(game.tableau[1], parse::cards(&vec!["3D", "2S", "AH"]));
 
     // Move the Ace of Hearts to the foundation
     game = match GameRules::move_cards(
@@ -364,12 +339,9 @@ fn test_game_rules_move_cards() -> Result<()> {
     };
 
     // Tableau is the 3 of Diamonds and 2 of Spades
-    assert_eq!(
-        game.tableau[1],
-        Stack::from_vec(&parse::cards(&vec!["3D", "2S"]))
-    );
+    assert_eq!(game.tableau[1], parse::cards(&vec!["3D", "2S"]));
     // Foundation is the Ace of Hearts
-    assert_eq!(game.foundations[0], vec![&parse::card("AH")]);
+    assert_eq!(game.foundations[0], vec![parse::card("AH")]);
 
     // Draw so the King of Clubs is available
     game = GameRules::draw_stock(game, 1)?;
@@ -383,7 +355,7 @@ fn test_game_rules_move_cards() -> Result<()> {
     // Talon is now empty
     assert!(game.talon.is_empty());
     // Third tableau is King of Clubs
-    assert_eq!(game.tableau[2], vec![&parse::card("KC")]);
+    assert_eq!(game.tableau[2], vec![parse::card("KC")]);
 
     Ok(())
 }
@@ -407,7 +379,7 @@ fn test_game_rules_move_cards_win() -> Result<()> {
 
     let game = PlayingGameState {
         tableau: [
-            Stack::from_vec(&tableau0),
+            tableau0,
             Stack::new(),
             Stack::new(),
             Stack::new(),
@@ -415,12 +387,7 @@ fn test_game_rules_move_cards_win() -> Result<()> {
             Stack::new(),
             Stack::new(),
         ],
-        foundations: [
-            Stack::from_vec(&foundation0),
-            Stack::from_vec(&foundation1),
-            Stack::from_vec(&foundation2),
-            Stack::from_vec(&foundation3),
-        ],
+        foundations: [foundation0, foundation1, foundation2, foundation3],
         stock: Stack::new(),
         talon: Stack::new(),
     };

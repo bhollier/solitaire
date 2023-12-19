@@ -6,12 +6,12 @@ use thiserror;
 pub trait PileRef: Eq {}
 
 /// Trait for the state of a Solitaire game
-pub trait GameState<'d, C: Card<N>, const N: usize, P: PileRef>: Sized + Clone + Eq {
+pub trait GameState<C: Card<N>, const N: usize, P: PileRef>: Sized + Clone + Eq {
     /// Retrieve a reference to the [Stack] at the given [PileRef]
-    fn get_stack(&self, p: P) -> Option<&Stack<'d, C>>;
+    fn get_stack(&self, p: P) -> Option<&Stack<C>>;
 
     /// Retrieve a mutable reference to the [Stack] at the given [PileRef]
-    fn get_stack_mut(&mut self, p: P) -> Option<&mut Stack<'d, C>>;
+    fn get_stack_mut(&mut self, p: P) -> Option<&mut Stack<C>>;
 }
 
 /// Enum of all the possible errors that may occur while operating on a [GameState]

@@ -156,4 +156,4 @@ impl solitaire::Card<{ Card::N }> for Card {
 pub type Deck = solitaire::Deck<Card, { Card::N }>;
 
 /// Convenience type alias for a [Stack](solitaire::Stack) of [Card]
-pub type Stack<'d> = solitaire::Stack<'d, Card>;
+pub type Stack = solitaire::Stack<Card>;

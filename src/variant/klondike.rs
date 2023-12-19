@@ -9,19 +9,22 @@ pub const NUM_TABLEAU: usize = 7;
 pub const NUM_FOUNDATIONS: usize = std::FrenchSuit::N;
 
 /// The initial [GameState] for Klondike Solitaire with [std::Card]
-pub type InitialGameState<'d> = std::InitialGameState<'d, std::Card, { std::Card::N }>;
+pub type InitialGameState = std::InitialGameState<std::Card, { std::Card::N }>;
 
 /// The mid-game "playing" [GameState] for Klondike Solitaire with [std::Card]
-pub type PlayingGameState<'d> =
-    std::PlayingGameState<'d, std::Card, { std::Card::N }, NUM_TABLEAU, NUM_FOUNDATIONS>;
+pub type PlayingGameState =
+    std::PlayingGameState<std::Card, { std::Card::N }, NUM_TABLEAU, NUM_FOUNDATIONS>;
 
 /// The win [GameState] for Klondike Solitaire with [std::Card]
-pub type WinGameState<'d> = std::WinGameState<'d, std::Card, { std::Card::N }, NUM_FOUNDATIONS>;
+pub type WinGameState = std::WinGameState<std::Card, { std::Card::N }, NUM_FOUNDATIONS>;
+
+/// Enum for all possible [GameState]s, for Klondike Solitaire with [std::Card]
+pub type GameStateOption =
+    std::GameStateOption<std::Card, { std::Card::N }, NUM_TABLEAU, NUM_FOUNDATIONS>;
 
 /// Enum for the resulting [GameState] after making a move,
 /// for Klondike Solitaire with [std::Card]
-pub type MoveResult<'d> =
-    std::MoveResult<'d, std::Card, { std::Card::N }, NUM_TABLEAU, NUM_FOUNDATIONS>;
+pub type MoveResult = std::MoveResult<std::Card, { std::Card::N }, NUM_TABLEAU, NUM_FOUNDATIONS>;
 
 /// The Game rules for Klondike Solitaire
 pub struct GameRules;
@@ -37,7 +40,7 @@ impl GameRules {
             talon: Stack::new(),
         };
 
-        let mut card: &std::Card;
+        let mut card: std::Card;
         for i in 0..NUM_TABLEAU {
             for j in i..NUM_TABLEAU {
                 card = take_one_vec_mut(&mut new_state.stock);
@@ -50,8 +53,8 @@ impl GameRules {
 
     /// Convenience function to create a new [InitialGameState]
     /// and then deal the cards with [deal](Self::deal)
-    pub fn new_and_deal(d: &[std::Card]) -> PlayingGameState {
-        Self::deal(InitialGameState::new(d))
+    pub fn new_and_deal() -> PlayingGameState {
+        Self::deal(InitialGameState::new())
     }
 
     /// Draws `n` cards from the [Stock](PileRef::Stock) onto the [Talon](PileRef::Talon).
@@ -75,7 +78,7 @@ impl GameRules {
                 // Take the cards from the stock
                 let take = take_n_vec_mut(&mut new_state.stock, n);
                 // Transfer to the talon
-                take.iter().for_each(|c| new_state.talon.push(*c));
+                take.iter().cloned().for_each(|c| new_state.talon.push(c));
             }
         }
         Ok(new_state)
@@ -87,10 +90,10 @@ impl GameRules {
     /// - [Tableau](PileRef::Tableau): cards must be of alternating [Color](std::Color) and in King to Ace order
     /// - [Stock](PileRef::Stock): always true
     /// - [Talon](PileRef::Talon): always true
-    pub fn valid_seq(p: PileRef, cs: &[&std::Card]) -> bool {
+    pub fn valid_seq(p: PileRef, cs: &[std::Card]) -> bool {
         match p {
             PileRef::Tableau(_) => {
-                let mut prev_card = cs[0];
+                let mut prev_card = &cs[0];
                 for card in &cs[1..cs.len()] {
                     if card.suit.color() == prev_card.suit.color() {
                         return false;
@@ -103,7 +106,7 @@ impl GameRules {
                 return true;
             }
             PileRef::Foundation(_) => {
-                let mut prev_card = cs[0];
+                let mut prev_card = &cs[0];
                 for card in &cs[1..cs.len()] {
                     if card.suit != prev_card.suit {
                         return false;
