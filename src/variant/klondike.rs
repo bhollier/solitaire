@@ -1,127 +1,62 @@
-use crate as solitaire;
-use crate::{
-    std, take_n_slice, take_n_vec_mut, Card, Error, GameState as GameStateTrait, Result, Stack,
-    StackFrom,
-};
+use crate::std::PileRef;
+use crate::{std, take_n_slice, take_n_vec_mut, take_one_vec_mut, Error, GameState, Result, Stack};
 use ::std::cmp;
 
+/// The number of [Tableau](PileRef::Tableau) piles in Klondike Solitaire
 pub const NUM_TABLEAU: usize = 7;
+
+/// The number of [Foundation](PileRef::Foundation) piles in Klondike Solitaire
 pub const NUM_FOUNDATIONS: usize = std::FrenchSuit::N;
 
-/// "Standard" (Klondike) solitaire piles
-#[derive(Eq, PartialEq)]
-pub enum PileRef {
-    /// The "tableau" of [Stack]s where cards are moved around
-    Tableau(usize),
+/// The initial [GameState] for Klondike Solitaire with [std::Card]
+pub type InitialGameState<'d> = std::InitialGameState<'d, std::Card, { std::Card::N }>;
 
-    /// The "foundation" where cards of each suit are accumulated
-    Foundation(usize),
+/// The mid-game "playing" [GameState] for Klondike Solitaire with [std::Card]
+pub type PlayingGameState<'d> =
+    std::PlayingGameState<'d, std::Card, { std::Card::N }, NUM_TABLEAU, NUM_FOUNDATIONS>;
 
-    /// The "stock" (or "hand") where the [Tableau](PileRef::Tableau)
-    /// is initially created from and additional cards are taken from
-    Stock,
+/// The win [GameState] for Klondike Solitaire with [std::Card]
+pub type WinGameState<'d> = std::WinGameState<'d, std::Card, { std::Card::N }, NUM_FOUNDATIONS>;
 
-    /// The "talon" (or "waste") where cards from the [Stock](PileRef::Stock)
-    /// with no place in the [Tableau](PileRef::Tableau) or [Foundation](PileRef::Foundation)
-    /// are added to
-    Talon,
-}
+/// Enum for the resulting [GameState] after making a move,
+/// for Klondike Solitaire with [std::Card]
+pub type MoveResult<'d> =
+    std::MoveResult<'d, std::Card, { std::Card::N }, NUM_TABLEAU, NUM_FOUNDATIONS>;
 
-impl solitaire::PileRef for PileRef {}
-
-/// Struct for a [GameState](solitaire::GameState) containing the four piles in Klondike
-// todo make NUM_TABLEAU and NUM_FOUNDATIONS generic consts?
-#[derive(Clone)]
-pub struct GenericGameState<'a, C: Card<N>, const N: usize> {
-    /// The tableau, see [Tableau](PileRef::Tableau)
-    pub tableau: [Stack<'a, C>; NUM_TABLEAU],
-
-    /// The foundations, see [Foundation](PileRef::Foundation)
-    pub foundations: [Stack<'a, C>; NUM_FOUNDATIONS],
-
-    /// The stock, see [Stock](PileRef::Stock)
-    pub stock: Stack<'a, C>,
-
-    /// The talon, see [Talon](PileRef::Talon)
-    pub talon: Stack<'a, C>,
-}
-
-impl<'a, C: Card<N>, const N: usize> solitaire::GameState<'a, C, N, PileRef>
-    for GenericGameState<'a, C, N>
-{
-    fn new(deck: &'a [C]) -> GenericGameState<'a, C, N> {
-        GenericGameState {
-            tableau: [(); NUM_TABLEAU].map(|_| Stack::new()),
-            foundations: [(); NUM_FOUNDATIONS].map(|_| Stack::new()),
-            stock: Stack::from_slice(deck),
-            talon: Stack::new(),
-        }
-    }
-
-    fn get_stack(&self, p: &PileRef) -> Option<&Stack<'a, C>> {
-        match p {
-            PileRef::Tableau(n) => self.tableau.get(*n),
-            PileRef::Foundation(n) => self.foundations.get(*n),
-            PileRef::Stock => Some(&self.stock),
-            PileRef::Talon => Some(&self.talon),
-        }
-    }
-
-    fn get_stack_mut(&mut self, p: &PileRef) -> Option<&mut Stack<'a, C>> {
-        match p {
-            PileRef::Tableau(n) => self.tableau.get_mut(*n),
-            PileRef::Foundation(n) => self.foundations.get_mut(*n),
-            PileRef::Stock => Some(&mut self.stock),
-            PileRef::Talon => Some(&mut self.talon),
-        }
-    }
-}
-
-/// A [GameState](solitaire::GameState) for a "standard" (Klondike) game of Solitaire with [std::Card]
-pub type GameState<'a> = GenericGameState<'a, std::Card, { std::Card::N }>;
-
-/// The Game rules for a "standard" (Klondike) game of Solitaire.
-/// Only works with a [std::GameState](GameState)
+/// The Game rules for Klondike Solitaire
 pub struct GameRules;
 
-macro_rules! impl_mut {
-    ($func_name:ident, $mut_func_name:ident $(,$($arg:ident:$arg_ty:ty),+)?) => {
-        #[doc="Mutable version of "]
-        #[doc=concat!("[GameRules::", stringify!($func_name), "]")]
-        #[doc=" which applies the result to the `state`."]
-        #[doc="If [Err] is returned then `state` is not be modified"]
-        pub fn $mut_func_name(state: &mut GameState $(,$($arg: $arg_ty),*)?) -> Result<()> {
-            let result = Self::$func_name(state.clone() $(,$($arg),*)?)?;
-            Ok(*state = result)
-        }
-    };
-}
-
 impl GameRules {
-    /// Deals out the initial cards at the start of the game,
-    /// returning a clone of `state` with the result of the deal.
-    pub fn deal(state: GameState) -> Result<GameState> {
-        if state.tableau.iter().any(|s| !s.is_empty()) {
-            return Err(Error::InvalidState);
-        }
+    /// Deals out the initial cards of a [InitialGameState],
+    /// returning a [PlayingGameState] with the result of the deal.
+    pub fn deal(state: InitialGameState) -> PlayingGameState {
+        let mut new_state = PlayingGameState {
+            tableau: [(); NUM_TABLEAU].map(|_| Stack::new()),
+            foundations: [(); NUM_FOUNDATIONS].map(|_| Stack::new()),
+            stock: state.stock,
+            talon: Stack::new(),
+        };
 
-        let mut new_state = state;
         let mut card: &std::Card;
         for i in 0..NUM_TABLEAU {
             for j in i..NUM_TABLEAU {
-                card = solitaire::take_one_vec_mut(&mut new_state.stock);
+                card = take_one_vec_mut(&mut new_state.stock);
                 new_state.tableau[j].push(card);
             }
         }
 
-        Ok(new_state)
+        new_state
     }
 
-    impl_mut!(deal, deal_mut);
+    /// Convenience function to create a new [InitialGameState]
+    /// and then deal the cards with [deal](Self::deal)
+    pub fn new_and_deal(d: &[std::Card]) -> PlayingGameState {
+        Self::deal(InitialGameState::new(d))
+    }
 
     /// Draws `n` cards from the [Stock](PileRef::Stock) onto the [Talon](PileRef::Talon).
     /// If the stock is empty, the talon is turned over and used as the stock.
-    pub fn draw_stock(state: GameState, n: usize) -> Result<GameState> {
+    pub fn draw_stock(state: PlayingGameState, n: usize) -> Result<PlayingGameState> {
         let mut new_state = state;
         match new_state.stock.len() {
             // Empty stock
@@ -146,15 +81,13 @@ impl GameRules {
         Ok(new_state)
     }
 
-    impl_mut!(draw_stock, draw_stock_mut, n: usize);
-
     /// If the given sequence of cards is valid to be moved by a player for the given [pile](PileRef),
     /// using the following rules:
     /// - [Foundation](PileRef::Foundation): cards must be of the same [Suit] and in Ace to King order
     /// - [Tableau](PileRef::Tableau): cards must be of alternating [Color](std::Color) and in King to Ace order
     /// - [Stock](PileRef::Stock): always true
     /// - [Talon](PileRef::Talon): always true
-    pub fn valid_seq(p: &PileRef, cs: &[&std::Card]) -> bool {
+    pub fn valid_seq(p: PileRef, cs: &[&std::Card]) -> bool {
         match p {
             PileRef::Tableau(_) => {
                 let mut prev_card = cs[0];
@@ -188,7 +121,7 @@ impl GameRules {
     }
 
     /// Attempts to move `take_n` [Card]s from the stack at `src` and place them onto `dst`,
-    /// returning a clone of `state` with the result of the move.
+    /// returning a copy of `state` with the result of the move.
     /// See [GameRules::valid_seq] for rules on what card sequences are valid to move.
     ///
     /// # Arguments
@@ -203,11 +136,11 @@ impl GameRules {
     ///   - [Tableau](PileRef::Tableau)
     ///   - [Foundation](PileRef::Foundation)
     pub fn move_cards(
-        state: GameState,
+        state: PlayingGameState,
         src: PileRef,
         take_n: usize,
         dst: PileRef,
-    ) -> Result<GameState> {
+    ) -> Result<MoveResult> {
         if take_n == 0 {
             return Err(Error::InvalidInput {
                 field: "take_n",
@@ -261,14 +194,14 @@ impl GameRules {
 
         // Source == destination is a no-op
         if src == dst {
-            return Ok(state);
+            return Ok(MoveResult::Playing(state));
         }
 
         // Create stacks for the new state of src and dst
         let new_src_stack: std::Stack;
         let new_dst_stack: std::Stack;
         {
-            let src_pile = state.get_stack(&src).ok_or(Error::InvalidInput {
+            let src_pile = state.get_stack(src).ok_or(Error::InvalidInput {
                 field: "src",
                 reason: "pile does not exist",
             })?;
@@ -281,20 +214,20 @@ impl GameRules {
             }
 
             let (rest, take) = take_n_slice(src_pile.as_slice(), take_n);
-            if !Self::valid_seq(&src, take) {
+            if !Self::valid_seq(src, take) {
                 return Err(Error::InvalidMove {
                     reason: "src sequence is invalid",
                 });
             }
 
-            new_src_stack = rest.iter().map(|c| *c).collect();
+            new_src_stack = rest.iter().cloned().collect();
 
-            let dst_pile = state.get_stack(&dst).ok_or(Error::InvalidInput {
+            let dst_pile = state.get_stack(dst).ok_or(Error::InvalidInput {
                 field: "dst",
                 reason: "pile does not exist",
             })?;
 
-            new_dst_stack = dst_pile.iter().chain(take.iter()).map(|c| *c).collect();
+            new_dst_stack = dst_pile.iter().chain(take.iter()).cloned().collect();
 
             if dst_pile.is_empty() {
                 match dst {
@@ -317,7 +250,7 @@ impl GameRules {
                 }
             } else {
                 if !Self::valid_seq(
-                    &dst,
+                    dst,
                     &new_dst_stack
                         [new_dst_stack.len() - take_n - 1..new_dst_stack.len() - take_n + 1],
                 ) {
@@ -328,17 +261,11 @@ impl GameRules {
             }
         }
 
-        let mut new_state = state;
-        *new_state.get_stack_mut(&src).unwrap() = new_src_stack;
-        *new_state.get_stack_mut(&dst).unwrap() = new_dst_stack;
-        Ok(new_state)
-    }
+        // todo win detection
 
-    impl_mut!(
-        move_cards,
-        move_cards_mut,
-        src: PileRef,
-        take_n: usize,
-        dst: PileRef
-    );
+        let mut new_state = state;
+        *new_state.get_stack_mut(src).unwrap() = new_src_stack;
+        *new_state.get_stack_mut(dst).unwrap() = new_dst_stack;
+        Ok(MoveResult::Playing(new_state))
+    }
 }

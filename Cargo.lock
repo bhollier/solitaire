@@ -133,6 +133,7 @@ dependencies = [
  "rand",
  "strum",
  "strum_macros",
+ "test_util",
  "thiserror",
 ]
 
@@ -175,6 +176,13 @@ dependencies = [
  "proc-macro2",
  "quote",
  "unicode-ident",
+]
+
+[[package]]
+name = "test_util"
+version = "0.1.0"
+dependencies = [
+ "solitaire",
 ]
 
 [[package]]

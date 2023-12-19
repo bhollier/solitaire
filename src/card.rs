@@ -1,10 +1,9 @@
 use rand;
 use rand::seq::SliceRandom;
-use std::fmt::Display;
 use std::hash::Hash;
 
 /// A solitaire Card. `N` is the total number of variations of Cards
-pub trait Card<const N: usize>: Copy + Clone + Eq + Ord + Hash + Display {
+pub trait Card<const N: usize>: Copy + Clone + Eq + Ord + Hash {
     /// Create a new (unshuffled) deck of Cards
     fn new_deck() -> Deck<Self, N>;
 }
@@ -13,7 +12,8 @@ pub trait Card<const N: usize>: Copy + Clone + Eq + Ord + Hash + Display {
 pub type Deck<C, const N: usize> = [C; N];
 
 /// A "Stack" of [Card] references, usually the [Card]s referencing the elements of a [Deck]
-pub type Stack<'a, C> = Vec<&'a C>;
+// todo change this to be backed by an array and benchmark
+pub type Stack<'d, C> = Vec<&'d C>;
 
 /// Trait extension for adding `from_*` functions to [Stack]
 pub trait StackFrom<C> {
@@ -29,7 +29,7 @@ pub trait StackFrom<C> {
     }
 }
 
-impl<'a, C> StackFrom<C> for Stack<'a, C> {}
+impl<'d, C> StackFrom<C> for Stack<'d, C> {}
 
 /// Shuffles the given deck mutably, using [rand::thread_rng()]
 pub fn shuffle<C: Card<N>, const N: usize>(d: &mut Deck<C, N>) {
@@ -52,10 +52,7 @@ pub fn take_n_slice<T>(slice: &[T], n: usize) -> (&[T], &[T]) {
 /// Creates two [Vec] from the given [Vec], as a tuple of the `(remaining, taken)`
 pub fn take_n_vec<'a, T>(cs: &Vec<&'a T>, n: usize) -> (Vec<&'a T>, Vec<&'a T>) {
     let (rest, cs) = take_n_slice(cs.as_slice(), n);
-    (
-        rest.iter().map(|c| *c).collect(),
-        cs.iter().map(|c| *c).collect(),
-    )
+    (rest.iter().cloned().collect(), cs.iter().cloned().collect())
 }
 
 /// Creates `n` elements from the given [Vec] and returns it,
@@ -73,7 +70,7 @@ pub fn take_one_slice<T>(cs: &[T]) -> (&[T], &T) {
 /// Returns the "top" card and a [Vec] of the remaining elements
 pub fn take_one_vec<'a, T>(cs: &Vec<&'a T>) -> (Vec<&'a T>, &'a T) {
     let (rest, cs) = take_n_slice(cs.as_slice(), 1);
-    (rest.iter().map(|c| *c).collect(), cs[0])
+    (rest.iter().cloned().collect(), cs[0])
 }
 
 /// Returns the "top" card and removes the element from the given [Vec]

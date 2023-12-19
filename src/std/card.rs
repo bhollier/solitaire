@@ -111,7 +111,7 @@ impl fmt::Display for Rank {
 
 /// A standard [Card](solitaire::Card) with a suit and a rank.
 /// Ord is implemented but only acts on the card's [Rank]
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
+#[derive(Copy, Clone, Eq, PartialEq, Hash)]
 pub struct Card {
     pub suit: FrenchSuit,
     pub rank: Rank,
@@ -139,7 +139,7 @@ impl PartialOrd for Card {
     }
 }
 
-impl fmt::Display for Card {
+impl fmt::Debug for Card {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{}{}", self.rank, self.suit)
     }
@@ -156,4 +156,4 @@ impl solitaire::Card<{ Card::N }> for Card {
 pub type Deck = solitaire::Deck<Card, { Card::N }>;
 
 /// Convenience type alias for a [Stack](solitaire::Stack) of [Card]
-pub type Stack<'a> = solitaire::Stack<'a, Card>;
+pub type Stack<'d> = solitaire::Stack<'d, Card>;

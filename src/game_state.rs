@@ -6,22 +6,17 @@ use thiserror;
 pub trait PileRef: Eq {}
 
 /// Trait for the state of a Solitaire game
-pub trait GameState<'a, C: Card<N>, const N: usize, P: PileRef>: Sized + Clone {
-    /// Creates a new game, using the given [Deck] (or slice)
-    fn new(deck: &'a [C]) -> Self;
-
+pub trait GameState<'d, C: Card<N>, const N: usize, P: PileRef>: Sized + Clone + Eq {
     /// Retrieve a reference to the [Stack] at the given [PileRef]
-    fn get_stack(&self, p: &P) -> Option<&Stack<'a, C>>;
+    fn get_stack(&self, p: P) -> Option<&Stack<'d, C>>;
+
     /// Retrieve a mutable reference to the [Stack] at the given [PileRef]
-    fn get_stack_mut(&mut self, p: &P) -> Option<&mut Stack<'a, C>>;
+    fn get_stack_mut(&mut self, p: P) -> Option<&mut Stack<'d, C>>;
 }
 
 /// Enum of all the possible errors that may occur while operating on a [GameState]
 #[derive(Debug, thiserror::Error, Eq, PartialEq)]
 pub enum Error {
-    #[error("The given GameState was invalid")]
-    InvalidState,
-
     #[error("The given input {field:?} was invalid. Reason: {reason:?}")]
     InvalidInput {
         field: &'static str,
