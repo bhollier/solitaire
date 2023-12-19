@@ -261,11 +261,26 @@ impl GameRules {
             }
         }
 
-        // todo win detection
-
         let mut new_state = state;
         *new_state.get_stack_mut(src).unwrap() = new_src_stack;
         *new_state.get_stack_mut(dst).unwrap() = new_dst_stack;
-        Ok(MoveResult::Playing(new_state))
+
+        match dst {
+            // If dst is a foundation, check for a win condition
+            PileRef::Foundation(_) => {
+                for foundation in &new_state.foundations {
+                    // Foundation doesn't have enough cards
+                    if foundation.len() < std::Rank::N {
+                        // So still playing
+                        return Ok(MoveResult::Playing(new_state));
+                    }
+                }
+                // All the foundations have the full suit, so return win state
+                Ok(MoveResult::Win(WinGameState {
+                    foundations: new_state.foundations,
+                }))
+            }
+            _ => Ok(MoveResult::Playing(new_state)),
+        }
     }
 }

@@ -387,3 +387,58 @@ fn test_game_rules_move_cards() -> Result<()> {
 
     Ok(())
 }
+
+/// Test the win condition
+#[test]
+fn test_game_rules_move_cards_win() -> Result<()> {
+    let tableau0 = parse::cards(&vec!["KS"]);
+    let foundation0 = parse::cards(&vec![
+        "AC", "2C", "3C", "4C", "5C", "6C", "7C", "8C", "9C", "XC", "JC", "QC", "KC",
+    ]);
+    let foundation1 = parse::cards(&vec![
+        "AS", "2S", "3S", "4S", "5S", "6S", "7S", "8S", "9S", "XS", "JS", "QS",
+    ]);
+    let foundation2 = parse::cards(&vec![
+        "AH", "2H", "3H", "4H", "5H", "6H", "7H", "8H", "9H", "XH", "JH", "QH", "KH",
+    ]);
+    let foundation3 = parse::cards(&vec![
+        "AD", "2D", "3D", "4D", "5D", "6D", "7D", "8D", "9D", "XD", "JD", "QD", "KD",
+    ]);
+
+    let game = PlayingGameState {
+        tableau: [
+            Stack::from_vec(&tableau0),
+            Stack::new(),
+            Stack::new(),
+            Stack::new(),
+            Stack::new(),
+            Stack::new(),
+            Stack::new(),
+        ],
+        foundations: [
+            Stack::from_vec(&foundation0),
+            Stack::from_vec(&foundation1),
+            Stack::from_vec(&foundation2),
+            Stack::from_vec(&foundation3),
+        ],
+        stock: Stack::new(),
+        talon: Stack::new(),
+    };
+
+    // Move the King to the foundation
+    let win = match GameRules::move_cards(
+        game,
+        std::PileRef::Tableau(0),
+        1,
+        std::PileRef::Foundation(1),
+    )? {
+        MoveResult::Playing(_) => panic!(),
+        MoveResult::Win(new) => new,
+    };
+
+    for foundation in win.foundations {
+        assert_eq!(foundation.len(), std::Rank::N);
+    }
+
+    Ok(())
+}
