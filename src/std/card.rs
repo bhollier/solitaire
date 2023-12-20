@@ -1,8 +1,10 @@
-use crate as solitaire;
-use arr_macro::arr;
 use std::*;
+
+use arr_macro::arr;
 use strum::EnumCount;
 use strum_macros::EnumCount as EnumCountMacro;
+
+use crate as solitaire;
 
 /// The color of a [FrenchSuit]
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]

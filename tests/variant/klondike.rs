@@ -1,5 +1,4 @@
-use solitaire::variant::klondike::*;
-use solitaire::*;
+use solitaire::{variant::klondike::*, *};
 use test_util::parse;
 
 /// Test the initial deal

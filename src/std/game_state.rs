@@ -1,5 +1,5 @@
 use crate as solitaire;
-use crate::{shuffle, Card, GameState, Stack, StackFrom, Deck};
+use crate::{shuffle, Card, Deck, GameState, Stack, StackFrom};
 
 /// "Standard" solitaire piles
 #[derive(Eq, PartialEq, Copy, Clone)]

@@ -1,6 +1,6 @@
-use rand;
-use rand::seq::SliceRandom;
 use std::hash::Hash;
+
+use rand::seq::SliceRandom;
 
 /// A solitaire Card. `N` is the total number of variations of Cards
 pub trait Card<const N: usize>: Copy + Clone + Eq + Ord + Hash {

@@ -1,5 +1,4 @@
-use solitaire::std;
-use solitaire::*;
+use solitaire::{std, *};
 
 #[test]
 fn test_take_n() {

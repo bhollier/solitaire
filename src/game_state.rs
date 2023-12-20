@@ -1,6 +1,7 @@
-use crate::*;
 use ::std;
 use thiserror;
+
+use crate::*;
 
 /// A reference to a "Pile" of [Card]s, e.g. the stock, a foundation
 pub trait PileRef: Eq {}

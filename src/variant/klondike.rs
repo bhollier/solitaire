@@ -1,6 +1,9 @@
-use crate::std::PileRef;
-use crate::{std, take_n_slice, take_n_vec_mut, take_one_vec_mut, Error, GameState, Result, Stack};
 use ::std::cmp;
+
+use crate::{
+    std, std::PileRef, take_n_slice, take_n_vec_mut, take_one_vec_mut, Error, GameState, Result,
+    Stack,
+};
 
 /// The number of [Tableau](PileRef::Tableau) piles in Klondike Solitaire
 pub const NUM_TABLEAU: usize = 7;
