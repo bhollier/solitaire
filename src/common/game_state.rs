@@ -125,10 +125,66 @@ impl<'d, C: Card<NC>, const NC: usize, const NF: usize> GameState<C, NC, PileRef
 }
 
 /// Enum for all possible [GameState]s
+#[derive(Clone, Eq, PartialEq)]
 pub enum GameStateOption<C: Card<NC>, const NC: usize, const NT: usize, const NF: usize> {
     Initial(InitialGameState<C, NC>),
     Playing(PlayingGameState<C, NC, NT, NF>),
     Win(WinGameState<C, NC, NF>),
+}
+
+impl<C: Card<NC>, const NC: usize, const NT: usize, const NF: usize> From<MoveResult<C, NC, NT, NF>>
+    for GameStateOption<C, NC, NT, NF>
+{
+    fn from(value: MoveResult<C, NC, NT, NF>) -> Self {
+        match value {
+            MoveResult::Playing(s) => GameStateOption::Playing(s),
+            MoveResult::Win(s) => GameStateOption::Win(s),
+        }
+    }
+}
+
+impl<C: Card<NC>, const NC: usize, const NT: usize, const NF: usize> GameState<C, NC, PileRef>
+    for GameStateOption<C, NC, NT, NF>
+{
+    fn get_stack(&self, p: PileRef) -> Option<&Stack<C>> {
+        match self {
+            GameStateOption::Initial(s) => s.get_stack(p),
+            GameStateOption::Playing(s) => s.get_stack(p),
+            GameStateOption::Win(s) => s.get_stack(p),
+        }
+    }
+
+    fn get_stack_mut(&mut self, p: PileRef) -> Option<&mut Stack<C>> {
+        match self {
+            GameStateOption::Initial(s) => s.get_stack_mut(p),
+            GameStateOption::Playing(s) => s.get_stack_mut(p),
+            GameStateOption::Win(s) => s.get_stack_mut(p),
+        }
+    }
+}
+
+impl<C: Card<NC>, const NC: usize, const NT: usize, const NF: usize> From<InitialGameState<C, NC>>
+    for GameStateOption<C, NC, NT, NF>
+{
+    fn from(value: InitialGameState<C, NC>) -> Self {
+        GameStateOption::Initial(value)
+    }
+}
+
+impl<C: Card<NC>, const NC: usize, const NT: usize, const NF: usize>
+    From<PlayingGameState<C, NC, NT, NF>> for GameStateOption<C, NC, NT, NF>
+{
+    fn from(value: PlayingGameState<C, NC, NT, NF>) -> Self {
+        GameStateOption::Playing(value)
+    }
+}
+
+impl<C: Card<NC>, const NC: usize, const NT: usize, const NF: usize> From<WinGameState<C, NC, NF>>
+    for GameStateOption<C, NC, NT, NF>
+{
+    fn from(value: WinGameState<C, NC, NF>) -> Self {
+        GameStateOption::Win(value)
+    }
 }
 
 /// Enum for the resulting [GameState] after making a move,
