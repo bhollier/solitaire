@@ -1,4 +1,4 @@
-//! Contains definitions for "standard" Solitaire concepts,
+//! Contains definitions for common Solitaire concepts,
 //! such as french-suited playing cards, the four piles, etc.
 
 pub mod card;

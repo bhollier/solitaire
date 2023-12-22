@@ -1,42 +1,42 @@
-use solitaire::std;
+use solitaire::common;
 
-pub fn rank(str: &str) -> std::Rank {
+pub fn rank(str: &str) -> common::Rank {
     match str {
-        "A" | "1" => std::Rank::Ace,
-        "2" => std::Rank::Two,
-        "3" => std::Rank::Three,
-        "4" => std::Rank::Four,
-        "5" => std::Rank::Five,
-        "6" => std::Rank::Six,
-        "7" => std::Rank::Seven,
-        "8" => std::Rank::Eight,
-        "9" => std::Rank::Nine,
-        "X" => std::Rank::Ten,
-        "J" => std::Rank::Jack,
-        "Q" => std::Rank::Queen,
-        "K" => std::Rank::King,
+        "A" | "1" => common::Rank::Ace,
+        "2" => common::Rank::Two,
+        "3" => common::Rank::Three,
+        "4" => common::Rank::Four,
+        "5" => common::Rank::Five,
+        "6" => common::Rank::Six,
+        "7" => common::Rank::Seven,
+        "8" => common::Rank::Eight,
+        "9" => common::Rank::Nine,
+        "X" => common::Rank::Ten,
+        "J" => common::Rank::Jack,
+        "Q" => common::Rank::Queen,
+        "K" => common::Rank::King,
         &_ => panic!("unknown rank {}", str),
     }
 }
 
-pub fn suit(str: &str) -> std::FrenchSuit {
+pub fn suit(str: &str) -> common::FrenchSuit {
     match str {
-        "♣" | "C" => std::FrenchSuit::Clubs,
-        "♠" | "S" => std::FrenchSuit::Spades,
-        "♥" | "H" => std::FrenchSuit::Hearts,
-        "♦" | "D" => std::FrenchSuit::Diamonds,
+        "♣" | "C" => common::FrenchSuit::Clubs,
+        "♠" | "S" => common::FrenchSuit::Spades,
+        "♥" | "H" => common::FrenchSuit::Hearts,
+        "♦" | "D" => common::FrenchSuit::Diamonds,
         &_ => panic!("unknown suit {}", str),
     }
 }
 
-pub fn card(str: &str) -> std::Card {
+pub fn card(str: &str) -> common::Card {
     let (rank_str, suit_str) = str.split_at(1);
-    std::Card {
+    common::Card {
         suit: suit(suit_str),
         rank: rank(rank_str),
     }
 }
 
-pub fn cards(strs: &[&str]) -> Vec<std::Card> {
+pub fn cards(strs: &[&str]) -> Vec<common::Card> {
     strs.iter().map(|str| card(str)).collect()
 }

@@ -14,7 +14,7 @@ pub enum Color {
 }
 
 /// A classic "French" [Suit](solitaire::Suit), with "Clubs", "Spades", "Hearts" and "Diamonds"
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash, EnumCountMacro)]
+#[derive(Copy, Clone, Eq, PartialEq, Hash, EnumCountMacro)]
 pub enum FrenchSuit {
     Clubs,
     Spades,
@@ -41,7 +41,7 @@ impl FrenchSuit {
     }
 }
 
-impl fmt::Display for FrenchSuit {
+impl fmt::Debug for FrenchSuit {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             FrenchSuit::Clubs => write!(f, "♣"),
@@ -55,7 +55,7 @@ impl fmt::Display for FrenchSuit {
 /// The standard Ranks of cards, which is King, Queen, Jack, Ten to Two and Ace.
 /// [Ord] is defined according to this ordering,
 /// as this is how cards are ordered in a [Stack](solitaire::Stack)
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, EnumCountMacro)]
+#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, EnumCountMacro)]
 pub enum Rank {
     King,
     Queen,
@@ -91,7 +91,7 @@ impl Rank {
     ];
 }
 
-impl fmt::Display for Rank {
+impl fmt::Debug for Rank {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             Rank::King => write!(f, "K"),
@@ -143,7 +143,7 @@ impl PartialOrd for Card {
 
 impl fmt::Debug for Card {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}{}", self.rank, self.suit)
+        write!(f, "{:?}{:?}", self.rank, self.suit)
     }
 }
 

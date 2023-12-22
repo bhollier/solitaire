@@ -1,8 +1,8 @@
-use solitaire::{std, *};
+use solitaire::{common, *};
 
 #[test]
 fn test_take_n() {
-    let d: std::Deck = std::Card::new_deck();
+    let d: common::Deck = common::Card::new_deck();
     {
         let (rest, cs) = take_n_slice(&d, 10);
         assert_eq!(rest, &d[..42]);
@@ -19,7 +19,7 @@ fn test_take_n() {
 
 #[test]
 fn test_take_one() {
-    let d: std::Deck = std::Card::new_deck();
+    let d: common::Deck = common::Card::new_deck();
     {
         let (rest, c) = take_one_slice(&d);
         assert_eq!(rest, &d[..51]);
@@ -27,7 +27,7 @@ fn test_take_one() {
     }
 
     {
-        let mut d_vec: std::Stack = Stack::from_slice(&d);
+        let mut d_vec: common::Stack = Stack::from_slice(&d);
         let c = take_one_vec_mut(&mut d_vec);
         assert_eq!(d_vec, d[..51]);
         assert_eq!(c, d[51]);

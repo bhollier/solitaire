@@ -1,10 +1,10 @@
-use solitaire::{variant::klondike::*, *};
+use solitaire::variant::klondike::*;
 use test_util::parse;
 
 /// Test the initial deal
 #[test]
 fn test_game_rules_deal() {
-    let deck: std::Deck = std::Card::new_deck();
+    let deck: Deck = Card::new_deck();
     let game = GameRules::deal(InitialGameState::from(deck));
 
     // Verify the cards were added to the tableau in the correct order
@@ -20,7 +20,7 @@ fn test_game_rules_deal() {
     }
 
     // Verify the stock has the correct cards
-    let expected_stock: std::Stack = deck[0..deck.len() - total_taken].iter().cloned().collect();
+    let expected_stock: Stack = deck[0..deck.len() - total_taken].iter().cloned().collect();
     assert_eq!(game.stock, expected_stock);
 }
 
@@ -59,12 +59,12 @@ fn test_game_rules_draw_stock() -> Result<()> {
 /// Test the sequence validation on its own for a tableau pile
 #[test]
 fn test_game_rules_valid_seq_tableau() {
-    let p = std::PileRef::Tableau(0);
+    let p = PileRef::Tableau(0);
 
     let valid = parse::cards(&vec!["KC", "QH", "JS", "XD"]);
     assert!(GameRules::valid_seq(p, valid.as_slice()));
 
-    let invalid_wrong_dir: Vec<std::Card> = valid.iter().rev().cloned().collect();
+    let invalid_wrong_dir: Vec<_> = valid.iter().rev().cloned().collect();
     assert!(!GameRules::valid_seq(p, invalid_wrong_dir.as_slice()));
 
     let invalid_same_color = parse::cards(&vec!["8H", "7D", "6D"]);
@@ -77,12 +77,12 @@ fn test_game_rules_valid_seq_tableau() {
 /// Test the sequence validation on its own for a foundation pile
 #[test]
 fn test_game_rules_valid_seq_foundation() {
-    let p = std::PileRef::Foundation(0);
+    let p = PileRef::Foundation(0);
 
     let valid = parse::cards(&vec!["XC", "JC", "QC", "KC"]);
     assert!(GameRules::valid_seq(p, valid.as_slice()));
 
-    let invalid_wrong_dir: Vec<std::Card> = valid.iter().rev().cloned().collect();
+    let invalid_wrong_dir: Vec<_> = valid.iter().rev().cloned().collect();
     assert!(!GameRules::valid_seq(p, invalid_wrong_dir.as_slice()));
 
     let invalid_different_suit = parse::cards(&vec!["6D", "7D", "8H"]);
@@ -99,7 +99,7 @@ fn test_game_rules_valid_seq_foundation() {
 fn test_game_rules_move_cards_invalid_input() {
     let game = GameRules::new_and_deal();
 
-    let pile = std::PileRef::Tableau(0);
+    let pile = PileRef::Tableau(0);
 
     assert_eq!(
         GameRules::move_cards(game.clone(), pile, 0, pile).err(),
@@ -110,12 +110,7 @@ fn test_game_rules_move_cards_invalid_input() {
     );
 
     assert_eq!(
-        GameRules::move_cards(
-            game.clone(),
-            std::PileRef::Stock,
-            1,
-            std::PileRef::Tableau(0)
-        ),
+        GameRules::move_cards(game.clone(), PileRef::Stock, 1, PileRef::Tableau(0)),
         Err(Error::InvalidInput {
             field: "src",
             reason: "cannot move cards from stock"
@@ -123,12 +118,7 @@ fn test_game_rules_move_cards_invalid_input() {
     );
 
     assert_eq!(
-        GameRules::move_cards(
-            game.clone(),
-            std::PileRef::Talon,
-            2,
-            std::PileRef::Tableau(0)
-        ),
+        GameRules::move_cards(game.clone(), PileRef::Talon, 2, PileRef::Tableau(0)),
         Err(Error::InvalidInput {
             field: "take_n",
             reason: "cannot move more than 1 card from talon"
@@ -136,12 +126,7 @@ fn test_game_rules_move_cards_invalid_input() {
     );
 
     assert_eq!(
-        GameRules::move_cards(
-            game.clone(),
-            std::PileRef::Tableau(0),
-            2,
-            std::PileRef::Foundation(0)
-        ),
+        GameRules::move_cards(game.clone(), PileRef::Tableau(0), 2, PileRef::Foundation(0)),
         Err(Error::InvalidInput {
             field: "take_n",
             reason: "cannot move more than 1 card to foundation"
@@ -149,12 +134,7 @@ fn test_game_rules_move_cards_invalid_input() {
     );
 
     assert_eq!(
-        GameRules::move_cards(
-            game.clone(),
-            std::PileRef::Tableau(0),
-            1,
-            std::PileRef::Stock
-        ),
+        GameRules::move_cards(game.clone(), PileRef::Tableau(0), 1, PileRef::Stock),
         Err(Error::InvalidInput {
             field: "dst",
             reason: "cannot move cards to stock"
@@ -162,12 +142,7 @@ fn test_game_rules_move_cards_invalid_input() {
     );
 
     assert_eq!(
-        GameRules::move_cards(
-            game.clone(),
-            std::PileRef::Tableau(0),
-            1,
-            std::PileRef::Talon
-        ),
+        GameRules::move_cards(game.clone(), PileRef::Tableau(0), 1, PileRef::Talon),
         Err(Error::InvalidInput {
             field: "dst",
             reason: "cannot move cards to talon"
@@ -200,12 +175,7 @@ fn test_game_rules_move_cards_invalid_move() -> Result<()> {
     };
 
     assert_eq!(
-        GameRules::move_cards(
-            game.clone(),
-            std::PileRef::Talon,
-            1,
-            std::PileRef::Tableau(0)
-        ),
+        GameRules::move_cards(game.clone(), PileRef::Talon, 1, PileRef::Tableau(0)),
         Err(Error::InvalidInput {
             field: "take_n",
             reason: "not enough cards in src pile"
@@ -216,60 +186,35 @@ fn test_game_rules_move_cards_invalid_move() -> Result<()> {
     game = GameRules::draw_stock(game, 1)?;
 
     assert_eq!(
-        GameRules::move_cards(
-            game.clone(),
-            std::PileRef::Talon,
-            1,
-            std::PileRef::Tableau(2)
-        ),
+        GameRules::move_cards(game.clone(), PileRef::Talon, 1, PileRef::Tableau(2)),
         Err(Error::InvalidMove {
             reason: "can only move a King to a space"
         })
     );
 
     assert_eq!(
-        GameRules::move_cards(
-            game.clone(),
-            std::PileRef::Tableau(0),
-            1,
-            std::PileRef::Foundation(0)
-        ),
+        GameRules::move_cards(game.clone(), PileRef::Tableau(0), 1, PileRef::Foundation(0)),
         Err(Error::InvalidMove {
             reason: "dst sequence is invalid"
         })
     );
 
     assert_eq!(
-        GameRules::move_cards(
-            game.clone(),
-            std::PileRef::Talon,
-            1,
-            std::PileRef::Tableau(1)
-        ),
+        GameRules::move_cards(game.clone(), PileRef::Talon, 1, PileRef::Tableau(1)),
         Err(Error::InvalidMove {
             reason: "dst sequence is invalid"
         })
     );
 
     assert_eq!(
-        GameRules::move_cards(
-            game.clone(),
-            std::PileRef::Tableau(1),
-            2,
-            std::PileRef::Tableau(0)
-        ),
+        GameRules::move_cards(game.clone(), PileRef::Tableau(1), 2, PileRef::Tableau(0)),
         Err(Error::InvalidMove {
             reason: "src sequence is invalid"
         })
     );
 
     assert_eq!(
-        GameRules::move_cards(
-            game.clone(),
-            std::PileRef::Tableau(1),
-            1,
-            std::PileRef::Tableau(0)
-        ),
+        GameRules::move_cards(game.clone(), PileRef::Tableau(1), 1, PileRef::Tableau(0)),
         Err(Error::InvalidMove {
             reason: "dst sequence is invalid"
         })
@@ -304,7 +249,7 @@ fn test_game_rules_move_cards() -> Result<()> {
     game = GameRules::draw_stock(game, 1)?;
 
     // Move the Ace of Hearts to the first tableau with a 2 of Spades
-    game = match GameRules::move_cards(game, std::PileRef::Talon, 1, std::PileRef::Tableau(0))? {
+    game = match GameRules::move_cards(game, PileRef::Talon, 1, PileRef::Tableau(0))? {
         MoveResult::Playing(new) => new,
         MoveResult::Win(_) => panic!(),
     };
@@ -315,8 +260,7 @@ fn test_game_rules_move_cards() -> Result<()> {
     assert_eq!(game.tableau[0], parse::cards(&vec!["2S", "AH"]));
 
     // Move the stack to the second tableau with a 3 of Diamonds
-    game = match GameRules::move_cards(game, std::PileRef::Tableau(0), 2, std::PileRef::Tableau(1))?
-    {
+    game = match GameRules::move_cards(game, PileRef::Tableau(0), 2, PileRef::Tableau(1))? {
         MoveResult::Playing(new) => new,
         MoveResult::Win(_) => panic!(),
     };
@@ -327,12 +271,7 @@ fn test_game_rules_move_cards() -> Result<()> {
     assert_eq!(game.tableau[1], parse::cards(&vec!["3D", "2S", "AH"]));
 
     // Move the Ace of Hearts to the foundation
-    game = match GameRules::move_cards(
-        game,
-        std::PileRef::Tableau(1),
-        1,
-        std::PileRef::Foundation(0),
-    )? {
+    game = match GameRules::move_cards(game, PileRef::Tableau(1), 1, PileRef::Foundation(0))? {
         MoveResult::Playing(new) => new,
         MoveResult::Win(_) => panic!(),
     };
@@ -346,7 +285,7 @@ fn test_game_rules_move_cards() -> Result<()> {
     game = GameRules::draw_stock(game, 1)?;
 
     // Move the King of Clubs to the third tableau which is empty
-    game = match GameRules::move_cards(game, std::PileRef::Talon, 1, std::PileRef::Tableau(2))? {
+    game = match GameRules::move_cards(game, PileRef::Talon, 1, PileRef::Tableau(2))? {
         MoveResult::Playing(new) => new,
         MoveResult::Win(_) => panic!(),
     };
@@ -392,18 +331,13 @@ fn test_game_rules_move_cards_win() -> Result<()> {
     };
 
     // Move the King to the foundation
-    let win = match GameRules::move_cards(
-        game,
-        std::PileRef::Tableau(0),
-        1,
-        std::PileRef::Foundation(1),
-    )? {
+    let win = match GameRules::move_cards(game, PileRef::Tableau(0), 1, PileRef::Foundation(1))? {
         MoveResult::Playing(_) => panic!(),
         MoveResult::Win(new) => new,
     };
 
     for foundation in win.foundations {
-        assert_eq!(foundation.len(), std::Rank::N);
+        assert_eq!(foundation.len(), Rank::N);
     }
 
     Ok(())

@@ -1,33 +1,32 @@
-use ::std::cmp;
+use std::cmp;
 
-use crate::{
-    std, std::PileRef, take_n_slice, take_n_vec_mut, take_one_vec_mut, Error, GameState, Result,
-    Stack,
-};
+pub use common::{Card, Color, Deck, FrenchSuit, PileRef, Rank, Stack};
+
+use crate::{common, take_n_slice, take_n_vec_mut, take_one_vec_mut, GameState};
+pub use crate::{Card as CardTrait, Error, Result, StackFrom};
 
 /// The number of [Tableau](PileRef::Tableau) piles in Klondike Solitaire
 pub const NUM_TABLEAU: usize = 7;
 
 /// The number of [Foundation](PileRef::Foundation) piles in Klondike Solitaire
-pub const NUM_FOUNDATIONS: usize = std::FrenchSuit::N;
+pub const NUM_FOUNDATIONS: usize = FrenchSuit::N;
 
-/// The initial [GameState] for Klondike Solitaire with [std::Card]
-pub type InitialGameState = std::InitialGameState<std::Card, { std::Card::N }>;
+/// The initial [GameState] for Klondike Solitaire with [common::Card]
+pub type InitialGameState = common::InitialGameState<Card, { Card::N }>;
 
-/// The mid-game "playing" [GameState] for Klondike Solitaire with [std::Card]
+/// The mid-game "playing" [GameState] for Klondike Solitaire with [common::Card]
 pub type PlayingGameState =
-    std::PlayingGameState<std::Card, { std::Card::N }, NUM_TABLEAU, NUM_FOUNDATIONS>;
+    common::PlayingGameState<Card, { Card::N }, NUM_TABLEAU, NUM_FOUNDATIONS>;
 
-/// The win [GameState] for Klondike Solitaire with [std::Card]
-pub type WinGameState = std::WinGameState<std::Card, { std::Card::N }, NUM_FOUNDATIONS>;
+/// The win [GameState] for Klondike Solitaire with [common::Card]
+pub type WinGameState = common::WinGameState<Card, { Card::N }, NUM_FOUNDATIONS>;
 
-/// Enum for all possible [GameState]s, for Klondike Solitaire with [std::Card]
-pub type GameStateOption =
-    std::GameStateOption<std::Card, { std::Card::N }, NUM_TABLEAU, NUM_FOUNDATIONS>;
+/// Enum for all possible [GameState]s, for Klondike Solitaire with [Card]
+pub type GameStateOption = common::GameStateOption<Card, { Card::N }, NUM_TABLEAU, NUM_FOUNDATIONS>;
 
 /// Enum for the resulting [GameState] after making a move,
-/// for Klondike Solitaire with [std::Card]
-pub type MoveResult = std::MoveResult<std::Card, { std::Card::N }, NUM_TABLEAU, NUM_FOUNDATIONS>;
+/// for Klondike Solitaire with [common::Card]
+pub type MoveResult = common::MoveResult<Card, { Card::N }, NUM_TABLEAU, NUM_FOUNDATIONS>;
 
 /// The Game rules for Klondike Solitaire
 pub struct GameRules;
@@ -43,7 +42,7 @@ impl GameRules {
             talon: Stack::new(),
         };
 
-        let mut card: std::Card;
+        let mut card: common::Card;
         for i in 0..NUM_TABLEAU {
             for j in i..NUM_TABLEAU {
                 card = take_one_vec_mut(&mut new_state.stock);
@@ -90,10 +89,10 @@ impl GameRules {
     /// If the given sequence of cards is valid to be moved by a player for the given [pile](PileRef),
     /// using the following rules:
     /// - [Foundation](PileRef::Foundation): cards must be of the same [Suit] and in Ace to King order
-    /// - [Tableau](PileRef::Tableau): cards must be of alternating [Color](std::Color) and in King to Ace order
+    /// - [Tableau](PileRef::Tableau): cards must be of alternating [Color](Color) and in King to Ace order
     /// - [Stock](PileRef::Stock): always true
     /// - [Talon](PileRef::Talon): always true
-    pub fn valid_seq(p: PileRef, cs: &[std::Card]) -> bool {
+    pub fn valid_seq(p: PileRef, cs: &[Card]) -> bool {
         match p {
             PileRef::Tableau(_) => {
                 let mut prev_card = &cs[0];
@@ -204,8 +203,8 @@ impl GameRules {
         }
 
         // Create stacks for the new state of src and dst
-        let new_src_stack: std::Stack;
-        let new_dst_stack: std::Stack;
+        let new_src_stack: Stack;
+        let new_dst_stack: Stack;
         {
             let src_pile = state.get_stack(src).ok_or(Error::InvalidInput {
                 field: "src",
@@ -238,14 +237,14 @@ impl GameRules {
             if dst_pile.is_empty() {
                 match dst {
                     PileRef::Tableau(_) => {
-                        if take[0].rank != std::Rank::King {
+                        if take[0].rank != Rank::King {
                             return Err(Error::InvalidMove {
                                 reason: "can only move a King to a space",
                             });
                         }
                     }
                     PileRef::Foundation(_) => {
-                        if take[0].rank != std::Rank::Ace {
+                        if take[0].rank != Rank::Ace {
                             return Err(Error::InvalidMove {
                                 reason: "dst sequence is invalid",
                             });
@@ -276,7 +275,7 @@ impl GameRules {
             PileRef::Foundation(_) => {
                 for foundation in &new_state.foundations {
                     // Foundation doesn't have enough cards
-                    if foundation.len() < std::Rank::N {
+                    if foundation.len() < Rank::N {
                         // So still playing
                         return Ok(MoveResult::Playing(new_state));
                     }
