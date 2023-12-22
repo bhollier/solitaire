@@ -49,6 +49,7 @@ pub fn tableau(tableau: &[klondike::Card], selected: TableauSelected, f: &mut Fr
         );
     }
 
+    let mut ty_padding = 0;
     for (i, c) in tableau.iter().enumerate() {
         let is_selected = match selected {
             TableauSelected::Unselected => false,
@@ -65,7 +66,6 @@ pub fn tableau(tableau: &[klondike::Card], selected: TableauSelected, f: &mut Fr
             border::ROUNDED
         };
 
-        let ty_padding = i as u16 * 2;
         let by_padding = rect
             .height
             .checked_sub(ty_padding + CARD_HEIGHT)
@@ -81,6 +81,15 @@ pub fn tableau(tableau: &[klondike::Card], selected: TableauSelected, f: &mut Fr
             .split(rect);
 
         render_card(Some(c), is_selected, border_set, f, rect[1]);
+
+        // Add 2 to the padding if the card is face up so the suit and rank are visible
+        if c.face_up {
+            ty_padding += 2
+
+            // Only use 1 padding for face down cards to minimise space
+        } else {
+            ty_padding += 1
+        }
     }
 }
 
