@@ -100,7 +100,7 @@ impl GameRules {
                     if card.suit.color() == prev_card.suit.color() {
                         return false;
                     }
-                    if card.rank.cmp(&prev_card.rank) != cmp::Ordering::Greater {
+                    if prev_card.rank.next() != Some(&card.rank) {
                         return false;
                     }
                     prev_card = card;
@@ -113,7 +113,7 @@ impl GameRules {
                     if card.suit != prev_card.suit {
                         return false;
                     }
-                    if card.rank.cmp(&prev_card.rank) != cmp::Ordering::Less {
+                    if prev_card.rank.prev() != Some(&card.rank) {
                         return false;
                     }
                     prev_card = card;
