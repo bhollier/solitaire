@@ -205,7 +205,7 @@ impl State for HoveringState {
                     Direction::Up => match pile_n {
                         0 => UIState::Hovering(HoveringState::Stock),
                         1 => UIState::Hovering(HoveringState::Talon),
-                        2 => UIState::Hovering(self),
+                        2 => UIState::Hovering(HoveringState::Talon),
                         _ => UIState::Hovering(HoveringState::Foundation(pile_n - 3)),
                     },
                     Direction::Left => match pile_n {
