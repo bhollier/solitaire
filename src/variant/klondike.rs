@@ -42,12 +42,13 @@ impl GameRules {
             talon: Stack::new(),
         };
 
-        let mut card: common::Card;
+        let mut card: Card;
         for i in 0..NUM_TABLEAU {
             for j in i..NUM_TABLEAU {
                 card = take_one_vec_mut(&mut new_state.stock);
                 new_state.tableau[j].push(card);
             }
+            new_state.tableau[i].last_mut().unwrap().face_up = true;
         }
 
         new_state
@@ -68,6 +69,10 @@ impl GameRules {
             0 => {
                 // Transfer all cards from the talon to the stock
                 (new_state.stock, new_state.talon) = (new_state.talon, new_state.stock);
+                // Mark as face down
+                for c in &mut new_state.stock {
+                    c.face_up = false;
+                }
                 new_state.stock.reverse();
             }
             len => {
@@ -78,9 +83,13 @@ impl GameRules {
                 // but handle it anyway by taking as much from the stock as is available
                 let n = cmp::min(n, len);
                 // Take the cards from the stock
-                let take = take_n_vec_mut(&mut new_state.stock, n);
+                let mut take = take_n_vec_mut(&mut new_state.stock, n);
+                // Mark as face up
+                for c in &mut take {
+                    c.face_up = true;
+                }
                 // Transfer to the talon
-                take.iter().cloned().for_each(|c| new_state.talon.push(c));
+                new_state.talon.append(&mut take);
             }
         }
         Ok(new_state)
@@ -90,9 +99,15 @@ impl GameRules {
     /// using the following rules:
     /// - [Foundation](PileRef::Foundation): cards must be of the same [Suit] and in Ace to King order
     /// - [Tableau](PileRef::Tableau): cards must be of alternating [Color](Color) and in King to Ace order
-    /// - [Stock](PileRef::Stock): always true
+    /// - [Stock](PileRef::Stock): always false
     /// - [Talon](PileRef::Talon): always true
     pub fn valid_seq(p: PileRef, cs: &[Card]) -> bool {
+        // Can't take non-face up cards
+        for c in cs {
+            if !c.face_up {
+                return false;
+            }
+        }
         match p {
             PileRef::Tableau(_) => {
                 let mut prev_card = &cs[0];
@@ -120,7 +135,7 @@ impl GameRules {
                 }
                 return true;
             }
-            PileRef::Stock => true,
+            PileRef::Stock => false,
             PileRef::Talon => true,
         }
     }
@@ -203,7 +218,7 @@ impl GameRules {
         }
 
         // Create stacks for the new state of src and dst
-        let new_src_stack: Stack;
+        let mut new_src_stack: Stack;
         let new_dst_stack: Stack;
         {
             let src_pile = state.get_stack(src).ok_or(Error::InvalidInput {
@@ -226,6 +241,10 @@ impl GameRules {
             }
 
             new_src_stack = rest.iter().cloned().collect();
+            match new_src_stack.last_mut() {
+                Some(c) => c.face_up = true,
+                _ => {}
+            }
 
             let dst_pile = state.get_stack(dst).ok_or(Error::InvalidInput {
                 field: "dst",

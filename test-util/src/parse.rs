@@ -1,3 +1,5 @@
+use lazy_static::lazy_static;
+use regex::Regex;
 use solitaire::common;
 
 pub fn rank(str: &str) -> common::Rank {
@@ -29,11 +31,20 @@ pub fn suit(str: &str) -> common::FrenchSuit {
     }
 }
 
+lazy_static! {
+    static ref CARD_PATTERN: Regex = Regex::new(r"^(?<h>#)?(?<r>.)(?<s>.)$").unwrap();
+}
+
 pub fn card(str: &str) -> common::Card {
-    let (rank_str, suit_str) = str.split_at(1);
+    let captures = CARD_PATTERN.captures(str).unwrap();
+    let (rank_str, suit_str) = (
+        captures.name("r").unwrap().as_str(),
+        captures.name("s").unwrap().as_str(),
+    );
     common::Card {
         suit: suit(suit_str),
         rank: rank(rank_str),
+        face_up: captures.name("h") == None,
     }
 }
 

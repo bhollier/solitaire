@@ -130,12 +130,13 @@ impl fmt::Debug for Rank {
     }
 }
 
-/// A standard [Card](solitaire::Card) with a suit and a rank.
-/// Ord is implemented but only acts on the card's [Rank]
+/// A standard [Card](solitaire::Card) with a suit and a rank, and if the card is face up.
+/// [Ord] is implemented but only acts on the card's [Rank]
 #[derive(Copy, Clone, Eq, PartialEq, Hash)]
 pub struct Card {
     pub suit: FrenchSuit,
     pub rank: Rank,
+    pub face_up: bool,
 }
 
 impl Card {
@@ -144,6 +145,7 @@ impl Card {
         Card {
             suit: FrenchSuit::VALUES[i / Rank::N],
             rank: Rank::VALUES[i % Rank::N],
+            face_up: false,
         }
     }
 }
