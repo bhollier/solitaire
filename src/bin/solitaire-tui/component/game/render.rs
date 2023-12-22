@@ -5,7 +5,7 @@ pub const CARD_WIDTH: u16 = 10;
 pub const CARD_HEIGHT: u16 = 7;
 
 pub fn stock(stock: &[klondike::Card], selected: bool, f: &mut Frame, rect: Rect) {
-    render_card(stock.last(), false, selected, border::ROUNDED, f, rect)
+    render_card(stock.last(), selected, border::ROUNDED, f, rect)
 }
 
 pub fn talon(talon: &[klondike::Card], selected: bool, f: &mut Frame, rect: Rect) {
@@ -18,11 +18,11 @@ pub fn talon(talon: &[klondike::Card], selected: bool, f: &mut Frame, rect: Rect
         .constraints([Constraint::Length(CARD_WIDTH), Constraint::Min(rx_padding)])
         .split(rect);
 
-    render_card(talon.last(), true, selected, border::ROUNDED, f, rect[0])
+    render_card(talon.last(), selected, border::ROUNDED, f, rect[0])
 }
 
 pub fn foundation(foundation: &[klondike::Card], selected: bool, f: &mut Frame, rect: Rect) {
-    render_card(foundation.last(), true, selected, border::ROUNDED, f, rect)
+    render_card(foundation.last(), selected, border::ROUNDED, f, rect)
 }
 
 #[derive(Eq, PartialEq)]
@@ -42,7 +42,6 @@ pub fn tableau(tableau: &[klondike::Card], selected: TableauSelected, f: &mut Fr
 
         return render_card(
             None,
-            true,
             selected != TableauSelected::Unselected,
             border::ROUNDED,
             f,
@@ -81,13 +80,12 @@ pub fn tableau(tableau: &[klondike::Card], selected: TableauSelected, f: &mut Fr
             ])
             .split(rect);
 
-        render_card(Some(c), true, is_selected, border_set, f, rect[1]);
+        render_card(Some(c), is_selected, border_set, f, rect[1]);
     }
 }
 
 fn render_card(
     card: Option<&klondike::Card>,
-    visible: bool,
     selected: bool,
     border_set: border::Set,
     f: &mut Frame,
@@ -107,7 +105,7 @@ fn render_card(
     let inner_rect = block.inner(rect);
 
     match card {
-        Some(c) => match visible {
+        Some(c) => match c.face_up {
             true => f.render_widget(
                 Paragraph::new(Text::styled(
                     card_to_str(c, inner_rect),
