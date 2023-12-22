@@ -284,18 +284,14 @@ impl State for SelectingState {
                     }
                 },
                 // Decrease
-                Direction::Down => match modifier {
-                    KeyModifiers::SHIFT => match take_n {
-                        // If only 2 cards are currently selected, move out of selecting mode
-                        2 => UIState::Hovering(HoveringState::Tableau(pile_n)),
-                        // Otherwise decrease take_n by 1
-                        _ => UIState::Selecting(SelectingState::Tableau {
-                            pile_n,
-                            take_n: take_n - 1,
-                        }),
-                    },
-                    // Cannot move down so do nothing
-                    _ => UIState::Selecting(self),
+                Direction::Down => match take_n {
+                    // If only 2 cards are currently selected, move out of selecting mode
+                    2 => UIState::Hovering(HoveringState::Tableau(pile_n)),
+                    // Otherwise decrease take_n by 1
+                    _ => UIState::Selecting(SelectingState::Tableau {
+                        pile_n,
+                        take_n: take_n - 1,
+                    }),
                 },
                 // Move the cards left/right
                 Direction::Left => match pile_n {

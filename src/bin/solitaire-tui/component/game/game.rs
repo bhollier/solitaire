@@ -64,13 +64,13 @@ impl<'a> Component for GameComponent {
                 Title::from(match self.ui_state {
                     UIState::Hovering(pile) => match pile {
                         HoveringState::Stock => "| navigate: ← ↑ ↓ → | draw: ␣ |",
-                        HoveringState::Talon => "| navigate: ← ↑ ↓ → | move: ⇧ + ← → |",
-                        HoveringState::Foundation(_) => "| navigate: ← ↑ ↓ → | move: ⇧ + ← → |",
+                        HoveringState::Talon => "| navigate: ← ↑ ↓ → | move: ⇧ + ← ↑ ↓ → |",
+                        HoveringState::Foundation(_) => "| navigate: ← ↑ ↓ → | move: ⇧ + ← ↑ ↓ → |",
                         HoveringState::Tableau(_) => {
                             "| navigate: ← ↑ ↓ → | move: ⇧ + ← → | take more: ⇧ + ↑ |"
                         }
                     },
-                    UIState::Selecting(_) => "| take more: ↑ | take less: ↓ | move: ← → |",
+                    UIState::Selecting(_) => "| take more: ⇧ + ↑ | take less: ↓ | move: ← → |",
                     UIState::Moving(_) => "| move: ← ↑ ↓ → | place: ␣ |",
                 })
                 .position(Position::Bottom)
