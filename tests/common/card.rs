@@ -16,10 +16,12 @@ fn test_ordering() {
     let c1 = common::Card {
         suit: common::FrenchSuit::Clubs,
         rank: common::Rank::Ace,
+        face_up: false,
     };
     let c2 = common::Card {
         suit: common::FrenchSuit::Clubs,
         rank: common::Rank::King,
+        face_up: false,
     };
     assert!(c1 > c2);
     assert!(c2 < c1);
