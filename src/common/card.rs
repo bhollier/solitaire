@@ -89,6 +89,25 @@ impl Rank {
         Rank::Two,
         Rank::Ace,
     ];
+
+    /// Retrieves the "next" rank, according to the ordering of [VALUES](Rank::VALUES),
+    /// aka the order that cards are stacked on the tableau
+    pub fn next(&self) -> Option<&Rank> {
+        Rank::VALUES
+            .iter()
+            .position(|r| r == self)
+            .and_then(|i| Rank::VALUES.get(i + 1))
+    }
+
+    /// Retrieves the "previous" rank, according to the ordering of [VALUES](Rank::VALUES),
+    /// aka the order that cards are stacked on the tableau
+    pub fn prev(&self) -> Option<&Rank> {
+        Rank::VALUES
+            .iter()
+            .position(|r| r == self)
+            .and_then(|i| i.checked_sub(1))
+            .and_then(|i| Rank::VALUES.get(i))
+    }
 }
 
 impl fmt::Debug for Rank {

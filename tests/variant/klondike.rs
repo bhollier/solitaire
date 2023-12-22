@@ -157,7 +157,7 @@ fn test_game_rules_move_cards_invalid_input() {
 fn test_game_rules_move_cards_invalid_move() -> Result<()> {
     let stock = parse::cards(&vec!["KC", "AH"]);
     let tableau0 = parse::cards(&vec!["2S"]);
-    let tableau1 = parse::cards(&vec!["6H", "3D"]);
+    let tableau1 = parse::cards(&vec!["6H", "3S"]);
 
     let mut game = PlayingGameState {
         tableau: [
