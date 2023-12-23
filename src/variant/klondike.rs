@@ -60,6 +60,12 @@ impl GameRules {
         Self::deal(InitialGameState::new())
     }
 
+    /// Convenience function to create a new [InitialGameState]
+    /// with the given [rand::Rng] and then deal the cards with [deal](Self::deal)
+    pub fn new_and_deal_with_rng<RNG: rand::Rng>(rng: &mut RNG) -> PlayingGameState {
+        Self::deal(InitialGameState::new_with_rng(rng))
+    }
+
     /// Draws `n` cards from the [Stock](PileRef::Stock) onto the [Talon](PileRef::Talon).
     /// If the stock is empty, the talon is turned over and used as the stock.
     pub fn draw_stock(state: PlayingGameState, n: usize) -> Result<PlayingGameState> {
