@@ -31,7 +31,7 @@ pub trait State {
         game_state: &GameStateOption,
     ) -> UIState;
 
-    fn handle_interact(self, modifier: KeyModifiers, game_state: &mut GameStateOption) -> UIState;
+    fn handle_interact(self, game_state: &mut GameStateOption) -> UIState;
 
     fn handle_goto(self, i: u8) -> UIState;
 
@@ -52,11 +52,11 @@ impl State for UIState {
         }
     }
 
-    fn handle_interact(self, modifier: KeyModifiers, game_state: &mut GameStateOption) -> UIState {
+    fn handle_interact(self, game_state: &mut GameStateOption) -> UIState {
         match self {
-            UIState::Hovering(s) => s.handle_interact(modifier, game_state),
-            UIState::Selecting(s) => s.handle_interact(modifier, game_state),
-            UIState::Moving(s) => s.handle_interact(modifier, game_state),
+            UIState::Hovering(s) => s.handle_interact(game_state),
+            UIState::Selecting(s) => s.handle_interact(game_state),
+            UIState::Moving(s) => s.handle_interact(game_state),
         }
     }
 
@@ -241,15 +241,17 @@ impl State for HoveringState {
         }
     }
 
-    fn handle_interact(self, _: KeyModifiers, game_state: &mut GameStateOption) -> UIState {
+    fn handle_interact(self, game_state: &mut GameStateOption) -> UIState {
         match game_state {
             GameStateOption::Playing(play) => match self {
                 HoveringState::Stock => match klondike::GameRules::draw_stock(play.clone(), 1) {
                     Ok(new_state) => *game_state = GameStateOption::Playing(new_state),
                     Err(_) => return UIState::Hovering(self),
                 },
-                // todo auto move
-                _ => {}
+                p => match klondike::GameRules::auto_move_card(play.clone(), p, 1) {
+                    Ok(new_state) => *game_state = GameStateOption::from(new_state),
+                    Err(_) => return UIState::Hovering(self),
+                },
             },
             _ => {}
         }
@@ -348,9 +350,25 @@ impl State for SelectingState {
         }
     }
 
-    fn handle_interact(self, _: KeyModifiers, _: &mut GameStateOption) -> UIState {
-        // no-op
-        UIState::Selecting(self)
+    fn handle_interact(self, game_state: &mut GameStateOption) -> UIState {
+        match game_state {
+            GameStateOption::Playing(play) => match self {
+                SelectingState::Tableau { pile_n, take_n } => {
+                    match klondike::GameRules::auto_move_card(
+                        play.clone(),
+                        klondike::PileRef::Tableau(pile_n),
+                        take_n,
+                    ) {
+                        Ok(new_state) => {
+                            *game_state = GameStateOption::from(new_state);
+                            UIState::Hovering(HoveringState::Tableau(pile_n))
+                        }
+                        Err(_) => UIState::Selecting(self),
+                    }
+                }
+            },
+            _ => UIState::Selecting(self),
+        }
     }
 
     fn handle_goto(self, i: u8) -> UIState {
@@ -441,7 +459,7 @@ impl State for MovingState {
         UIState::Moving(MovingState { dst, ..self })
     }
 
-    fn handle_interact(self, _: KeyModifiers, game_state: &mut GameStateOption) -> UIState {
+    fn handle_interact(self, game_state: &mut GameStateOption) -> UIState {
         match game_state {
             GameStateOption::Playing(play_state) => {
                 return match klondike::GameRules::move_cards(

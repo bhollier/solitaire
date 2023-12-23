@@ -41,8 +41,8 @@ impl<'a> Component for GameComponent {
             Event::KeyPress(KeyCode::Right, m)
             | Event::KeyPress(KeyCode::Char('d'), m)
             | Event::KeyPress(KeyCode::Char('D'), m) => self.handle_right(*m),
-            Event::KeyPress(KeyCode::Enter, m) | Event::KeyPress(KeyCode::Char(' '), m) => {
-                self.handle_interact(*m)
+            Event::KeyPress(KeyCode::Enter, _) | Event::KeyPress(KeyCode::Char(' '), _) => {
+                self.handle_interact()
             }
             Event::KeyPress(KeyCode::Char(c @ '1'..='9'), _) => {
                 self.handle_goto(c.to_digit(10).unwrap())
@@ -129,8 +129,8 @@ impl GameComponent {
         Ok(())
     }
 
-    fn handle_interact(&mut self, modifier: KeyModifiers) -> Result<()> {
-        self.ui_state = self.ui_state.handle_interact(modifier, &mut self.state);
+    fn handle_interact(&mut self) -> Result<()> {
+        self.ui_state = self.ui_state.handle_interact(&mut self.state);
         Ok(())
     }
 
