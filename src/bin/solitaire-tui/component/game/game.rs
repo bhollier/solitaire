@@ -21,12 +21,13 @@ use crate::{
     event::Event,
 };
 
-pub struct GameComponent {
+pub struct GameComponent<RNG: rand::Rng> {
+    rng: RNG,
     state: klondike::GameStateOption,
     ui_state: UIState,
 }
 
-impl<'a> Component for GameComponent {
+impl<RNG: rand::Rng> Component for GameComponent<RNG> {
     fn handle_event(&mut self, event: &Event) -> Result<()> {
         match event {
             Event::KeyPress(KeyCode::Up, m)
@@ -93,10 +94,13 @@ impl<'a> Component for GameComponent {
     }
 }
 
-impl GameComponent {
-    pub fn new() -> GameComponent {
+impl<RNG: rand::Rng> GameComponent<RNG> {
+    pub fn new(rng: RNG) -> GameComponent<RNG> {
+        let mut rng = rng;
+        let state = klondike::GameRules::new_and_deal_with_rng(&mut rng);
         GameComponent {
-            state: klondike::GameStateOption::from(klondike::GameRules::new_and_deal()),
+            rng,
+            state: klondike::GameStateOption::from(state),
             ui_state: UIState::Hovering(HoveringState::Stock),
         }
     }
@@ -145,10 +149,10 @@ impl GameComponent {
     }
 
     fn handle_reset(&mut self) -> Result<()> {
-        *self = GameComponent {
-            state: klondike::GameStateOption::from(klondike::GameRules::new_and_deal()),
-            ui_state: UIState::Hovering(HoveringState::Stock),
-        };
+        self.state = klondike::GameStateOption::from(klondike::GameRules::new_and_deal_with_rng(
+            &mut self.rng,
+        ));
+        self.ui_state = UIState::Hovering(HoveringState::Stock);
         Ok(())
     }
 }

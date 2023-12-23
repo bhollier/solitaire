@@ -6,11 +6,11 @@ use crate::{
     event::Event,
 };
 
-pub struct AppComponent {
-    game: GameComponent,
+pub struct AppComponent<RNG: rand::Rng> {
+    game: GameComponent<RNG>,
 }
 
-impl<'a> Component for AppComponent {
+impl<RNG: rand::Rng> Component for AppComponent<RNG> {
     fn handle_event(&mut self, event: &Event) -> Result<()> {
         self.game.handle_event(event)?;
         Ok(())
@@ -21,10 +21,10 @@ impl<'a> Component for AppComponent {
     }
 }
 
-impl<'a> AppComponent {
-    pub fn new() -> AppComponent {
+impl<RNG: rand::Rng + Clone> AppComponent<RNG> {
+    pub fn new(rng: &RNG) -> AppComponent<RNG> {
         AppComponent {
-            game: GameComponent::new(),
+            game: GameComponent::new(rng.clone()),
         }
     }
 }
