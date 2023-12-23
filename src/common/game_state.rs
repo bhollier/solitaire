@@ -2,7 +2,7 @@ use crate as solitaire;
 use crate::{shuffle, Card, Deck, GameState, Stack, StackFrom};
 
 /// "Standard" solitaire piles
-#[derive(Eq, PartialEq, Copy, Clone)]
+#[derive(Eq, PartialEq, Copy, Clone, Hash)]
 pub enum PileRef {
     /// The "tableau" of [Stack]s where cards are moved around
     Tableau(usize),

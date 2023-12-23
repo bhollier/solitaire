@@ -1,10 +1,11 @@
-use ::std;
+use std::{self, hash::Hash};
+
 use thiserror;
 
 use crate::*;
 
 /// A reference to a "Pile" of [Card]s, e.g. the stock, a foundation
-pub trait PileRef: Eq {}
+pub trait PileRef: Eq + Hash {}
 
 /// Trait for the state of a Solitaire game
 pub trait GameState<C: Card<N>, const N: usize, P: PileRef>: Sized + Clone + Eq {

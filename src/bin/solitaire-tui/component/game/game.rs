@@ -7,15 +7,13 @@ use ratatui::{
     },
     Frame,
 };
-use solitaire::{variant::klondike, GameState};
+use solitaire::variant::klondike;
 
 use crate::{
     component::{
         game::{
-            render,
-            render::{CARD_HEIGHT, CARD_WIDTH},
-            ui_state,
-            ui_state::{HoveringState, MovingState, SelectingState, State, UIState},
+            render, ui_state,
+            ui_state::{HoveringState, State, UIState},
         },
         Component,
     },
@@ -79,94 +77,7 @@ impl<'a> Component for GameComponent {
 
         let inner_rect = outer.inner(rect);
 
-        let width = CARD_WIDTH * klondike::NUM_TABLEAU as u16;
-        let horizontal_pad = inner_rect.width.checked_sub(width).unwrap_or(0);
-
-        let inner_rect = Layout::default()
-            .direction(Direction::Horizontal)
-            .constraints([Constraint::Length(width), Constraint::Min(horizontal_pad)])
-            .split(inner_rect)[0];
-
-        let vstack = Layout::default()
-            .direction(Direction::Vertical)
-            .constraints([
-                Constraint::Length(CARD_HEIGHT),
-                Constraint::Length(CARD_HEIGHT * 3),
-            ])
-            .split(inner_rect);
-
-        // Render the top row
-        {
-            let top = Layout::default()
-                .direction(Direction::Horizontal)
-                .constraints([
-                    Constraint::Length(CARD_WIDTH),
-                    // Talon is two widths wide
-                    Constraint::Length(CARD_WIDTH * 2),
-                    Constraint::Length(CARD_WIDTH),
-                    Constraint::Length(CARD_WIDTH),
-                    Constraint::Length(CARD_WIDTH),
-                    Constraint::Length(CARD_WIDTH),
-                ])
-                .split(vstack[0]);
-
-            render::stock(
-                self.state
-                    .get_stack(klondike::PileRef::Stock)
-                    .map_or(&[], |s| s.as_slice()),
-                self.ui_state == UIState::Hovering(HoveringState::Stock),
-                f,
-                top[0],
-            );
-
-            render::talon(
-                self.get_cards_during_move(klondike::PileRef::Talon)
-                    .as_slice(),
-                self.ui_state == UIState::Hovering(HoveringState::Talon),
-                f,
-                top[1],
-            );
-
-            for (i, foundation_rect) in top[2..6].iter().enumerate() {
-                let cards = self.get_cards_during_move(klondike::PileRef::Foundation(i));
-                render::foundation(
-                    cards.as_slice(),
-                    self.ui_state == UIState::Hovering(HoveringState::Foundation(i)),
-                    f,
-                    *foundation_rect,
-                );
-            }
-        }
-
-        // Render the tableau
-        let tableau = Layout::default()
-            .direction(Direction::Horizontal)
-            .constraints([(); klondike::NUM_TABLEAU].map(|_| Constraint::Length(CARD_WIDTH)))
-            .split(vstack[1]);
-
-        for (i, tableau_rect) in tableau.iter().enumerate() {
-            let cards = self.get_cards_during_move(klondike::PileRef::Tableau(i));
-
-            let selected = match self.ui_state {
-                UIState::Hovering(HoveringState::Tableau(pile_n)) => {
-                    if pile_n == i {
-                        render::TableauSelected::Selected(1)
-                    } else {
-                        render::TableauSelected::Unselected
-                    }
-                }
-                UIState::Selecting(SelectingState::Tableau { pile_n, take_n }) => {
-                    if pile_n == i {
-                        render::TableauSelected::Selected(take_n)
-                    } else {
-                        render::TableauSelected::Unselected
-                    }
-                }
-                _ => render::TableauSelected::Unselected,
-            };
-
-            render::tableau(cards.as_slice(), selected, f, *tableau_rect);
-        }
+        render::GameState::from((&self.state, &self.ui_state)).render(f, inner_rect);
 
         f.render_widget(outer, rect);
     }
@@ -211,48 +122,6 @@ impl GameComponent {
     fn handle_interact(&mut self, modifier: KeyModifiers) -> Result<()> {
         self.ui_state = self.ui_state.handle_interact(modifier, &mut self.state);
         Ok(())
-    }
-
-    fn get_cards_during_move(&self, p: klondike::PileRef) -> klondike::Stack {
-        // Get the pile's stack
-        let mut cards: klondike::Stack = self
-            .state
-            .get_stack(p)
-            .map_or_else(|| Vec::new(), |s| s.clone());
-
-        // Match the moving state
-        match self.ui_state {
-            UIState::Moving(MovingState { src, take_n, dst }) => {
-                // If the src == dst is a no op
-                if src == dst {
-
-                    // This is the source of the move
-                } else if src == p {
-                    // Remove take_n cards from the pile
-                    cards.truncate(cards.len() - take_n);
-
-                    // This is the destination of the move
-                } else if dst == p {
-                    // Take cards from the source
-                    let src_cards: &[klondike::Card] = &self
-                        .state
-                        .get_stack(src)
-                        .map_or(&[] as &[klondike::Card], |s| s.as_slice());
-
-                    let src_cards = &src_cards[src_cards.len() - take_n..];
-
-                    // Concatenate this pile and the source cards
-                    cards = cards
-                        .iter()
-                        .chain(src_cards.iter())
-                        .cloned()
-                        .collect::<Vec<klondike::Card>>()
-                }
-            }
-            _ => {}
-        };
-
-        cards
     }
 
     fn reset(&mut self) {
