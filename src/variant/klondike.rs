@@ -221,19 +221,19 @@ impl GameRules {
         let mut new_src_stack: Stack;
         let new_dst_stack: Stack;
         {
-            let src_pile = state.get_stack(src).ok_or(Error::InvalidInput {
+            let src_stack = state.get_stack(src).ok_or(Error::InvalidInput {
                 field: "src",
                 reason: "pile does not exist",
             })?;
 
-            if take_n > src_pile.len() {
+            if take_n > src_stack.len() {
                 return Err(Error::InvalidInput {
                     field: "take_n",
                     reason: "not enough cards in src pile",
                 });
             }
 
-            let (rest, take) = take_n_slice(src_pile.as_slice(), take_n);
+            let (rest, take) = take_n_slice(src_stack.as_slice(), take_n);
             if !Self::valid_seq(src, take) {
                 return Err(Error::InvalidMove {
                     reason: "src sequence is invalid",
@@ -246,14 +246,14 @@ impl GameRules {
                 _ => {}
             }
 
-            let dst_pile = state.get_stack(dst).ok_or(Error::InvalidInput {
+            let dst_stack = state.get_stack(dst).ok_or(Error::InvalidInput {
                 field: "dst",
                 reason: "pile does not exist",
             })?;
 
-            new_dst_stack = dst_pile.iter().chain(take.iter()).cloned().collect();
+            new_dst_stack = dst_stack.iter().chain(take.iter()).cloned().collect();
 
-            if dst_pile.is_empty() {
+            if dst_stack.is_empty() {
                 match dst {
                     PileRef::Tableau(_) => {
                         if take[0].rank != Rank::King {
@@ -306,5 +306,52 @@ impl GameRules {
             }
             _ => Ok(MoveResult::Playing(new_state)),
         }
+    }
+
+    pub fn auto_move_card(
+        state: PlayingGameState,
+        src: PileRef,
+        take_n: usize,
+    ) -> Result<MoveResult> {
+        match src {
+            // No op
+            PileRef::Foundation(_) => return Ok(MoveResult::Playing(state)),
+            _ => {}
+        }
+
+        let try_move_cards = |dst| -> Result<Option<MoveResult>> {
+            match Self::move_cards(state.clone(), src, take_n, dst) {
+                Ok(result) => Ok(Some(result)),
+                // Return if there's a legitimate error (invalid input)
+                Err(err @ Error::InvalidInput { .. }) => Err(err),
+                _ => Ok(None),
+            }
+        };
+
+        // First, try placing in the foundations
+        // (but only if take_n is 1)
+        if take_n == 1 {
+            for dst in (0..NUM_FOUNDATIONS).map(|i| PileRef::Foundation(i)) {
+                match try_move_cards(dst)? {
+                    Some(result) => return Ok(result),
+                    _ => {}
+                }
+            }
+        }
+
+        // Try placing in the tableau
+        for dst in (0..NUM_TABLEAU).map(|i| PileRef::Tableau(i)) {
+            // Skip if this is the source
+            if src == dst {
+                continue;
+            }
+            match try_move_cards(dst)? {
+                Some(result) => return Ok(result),
+                _ => {}
+            }
+        }
+
+        // No where to move the card, so no-op
+        Ok(MoveResult::Playing(state))
     }
 }

@@ -244,6 +244,7 @@ fn test_game_rules_move_cards_invalid_move() -> Result<()> {
 
 /// Test moving cards around
 #[test]
+#[allow(unused_variables, unused_braces)]
 fn test_game_rules_move_cards() -> Result<()> {
     let stock = parse::cards(&vec!["#KC", "#AH"]);
     let tableau0 = parse::cards(&vec!["#4D", "2S"]);
@@ -267,7 +268,29 @@ fn test_game_rules_move_cards() -> Result<()> {
     // Draw so the card in the stock is available in the talon
     game = GameRules::draw_stock(game, 1)?;
 
+    macro_rules! test_move_and_auto {
+        (
+            GameRules::move_cards($src:tt, $take_n:literal, $dst:expr);
+            $asserts:block
+        ) => {
+            let game_clone = game.clone();
+
+            game = match GameRules::move_cards(game_clone.clone(), $src, $take_n, $dst)? {
+                MoveResult::Playing(new) => new,
+                MoveResult::Win(_) => panic!(),
+            };
+            $asserts
+
+            game = match GameRules::auto_move_card(game_clone.clone(), $src, $take_n)? {
+                MoveResult::Playing(new) => new,
+                MoveResult::Win(_) => panic!(),
+            };
+            $asserts
+        };
+    }
+
     // Move the Ace of Hearts to the first tableau with a hidden and a 2 of Spades
+    // (can't test auto here as it would put it straight into the foundation)
     game = match GameRules::move_cards(game, PileRef::Talon, 1, PileRef::Tableau(0))? {
         MoveResult::Playing(new) => new,
         MoveResult::Win(_) => panic!(),
@@ -278,41 +301,41 @@ fn test_game_rules_move_cards() -> Result<()> {
     // Tableau is a hidden card, 2 of Spades and Ace of Hearts
     assert_eq!(game.tableau[0], parse::cards(&vec!["#4D", "2S", "AH"]));
 
-    // Move the stack to the second tableau with a 3 of Diamonds
-    game = match GameRules::move_cards(game, PileRef::Tableau(0), 2, PileRef::Tableau(1))? {
-        MoveResult::Playing(new) => new,
-        MoveResult::Win(_) => panic!(),
-    };
+    test_move_and_auto! {
+        // Move the stack to the second tableau with a 3 of Diamonds
+        GameRules::move_cards({PileRef::Tableau(0)}, 2, {PileRef::Tableau(1)});
+        {
+            // First tableau is now the (face up) 4 of diamonds
+            assert_eq!(game.tableau[0], vec![parse::card("4D")]);
+            // Second tableau is the 3 of Diamonds, 2 of Spades and Ace of Hearts
+            assert_eq!(game.tableau[1], parse::cards(&vec!["3D", "2S", "AH"]));
+        }
+    }
 
-    // First tableau is now the (face up) 4 of diamonds
-    assert_eq!(game.tableau[0], vec![parse::card("4D")]);
-    // Second tableau is the 3 of Diamonds, 2 of Spades and Ace of Hearts
-    assert_eq!(game.tableau[1], parse::cards(&vec!["3D", "2S", "AH"]));
-
-    // Move the Ace of Hearts to the foundation
-    game = match GameRules::move_cards(game, PileRef::Tableau(1), 1, PileRef::Foundation(0))? {
-        MoveResult::Playing(new) => new,
-        MoveResult::Win(_) => panic!(),
-    };
-
-    // Tableau is the 3 of Diamonds and 2 of Spades
-    assert_eq!(game.tableau[1], parse::cards(&vec!["3D", "2S"]));
-    // Foundation is the Ace of Hearts
-    assert_eq!(game.foundations[0], vec![parse::card("AH")]);
+    test_move_and_auto! {
+        // Move the Ace of Hearts to the foundation
+        GameRules::move_cards({PileRef::Tableau(1)}, 1, {PileRef::Foundation(0)});
+        {
+            // Tableau is the 3 of Diamonds and 2 of Spades
+            assert_eq!(game.tableau[1], parse::cards(&vec!["3D", "2S"]));
+            // Foundation is the Ace of Hearts
+            assert_eq!(game.foundations[0], vec![parse::card("AH")]);
+        }
+    }
 
     // Draw so the King of Clubs is available
     game = GameRules::draw_stock(game, 1)?;
 
-    // Move the King of Clubs to the third tableau which is empty
-    game = match GameRules::move_cards(game, PileRef::Talon, 1, PileRef::Tableau(2))? {
-        MoveResult::Playing(new) => new,
-        MoveResult::Win(_) => panic!(),
-    };
-
-    // Talon is now empty
-    assert!(game.talon.is_empty());
-    // Third tableau is King of Clubs
-    assert_eq!(game.tableau[2], vec![parse::card("KC")]);
+    test_move_and_auto! {
+        // Move the King of Clubs to the third tableau which is empty
+        GameRules::move_cards({PileRef::Talon}, 1, {PileRef::Tableau(2)});
+        {
+            // Talon is now empty
+            assert!(game.talon.is_empty());
+            // Third tableau is King of Clubs
+            assert_eq!(game.tableau[2], vec![parse::card("KC")]);
+        }
+    }
 
     Ok(())
 }
