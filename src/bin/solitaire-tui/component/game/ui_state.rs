@@ -32,6 +32,10 @@ pub trait State {
     ) -> UIState;
 
     fn handle_interact(self, modifier: KeyModifiers, game_state: &mut GameStateOption) -> UIState;
+
+    fn handle_goto(self, i: u8) -> UIState;
+
+    fn handle_cancel(self) -> UIState;
 }
 
 impl State for UIState {
@@ -53,6 +57,22 @@ impl State for UIState {
             UIState::Hovering(s) => s.handle_interact(modifier, game_state),
             UIState::Selecting(s) => s.handle_interact(modifier, game_state),
             UIState::Moving(s) => s.handle_interact(modifier, game_state),
+        }
+    }
+
+    fn handle_goto(self, i: u8) -> UIState {
+        match self {
+            UIState::Hovering(s) => s.handle_goto(i),
+            UIState::Selecting(s) => s.handle_goto(i),
+            UIState::Moving(s) => s.handle_goto(i),
+        }
+    }
+
+    fn handle_cancel(self) -> UIState {
+        match self {
+            UIState::Hovering(s) => s.handle_cancel(),
+            UIState::Selecting(s) => s.handle_cancel(),
+            UIState::Moving(s) => s.handle_cancel(),
         }
     }
 }
@@ -235,6 +255,20 @@ impl State for HoveringState {
         }
         UIState::Hovering(self)
     }
+
+    fn handle_goto(self, i: u8) -> UIState {
+        match i {
+            1 => UIState::Hovering(HoveringState::Stock),
+            2 => UIState::Hovering(HoveringState::Talon),
+            i @ 3..=6 => UIState::Hovering(HoveringState::Foundation(i as usize - 3)),
+            _ => UIState::Hovering(self),
+        }
+    }
+
+    fn handle_cancel(self) -> UIState {
+        // no-op
+        UIState::Hovering(self)
+    }
 }
 
 #[derive(Copy, Clone, Eq, PartialEq)]
@@ -318,6 +352,29 @@ impl State for SelectingState {
         // no-op
         UIState::Selecting(self)
     }
+
+    fn handle_goto(self, i: u8) -> UIState {
+        match self {
+            SelectingState::Tableau { pile_n, take_n } => UIState::Moving(MovingState {
+                src: klondike::PileRef::Tableau(pile_n),
+                take_n,
+                dst: match i {
+                    1 => klondike::PileRef::Stock,
+                    2 => klondike::PileRef::Talon,
+                    i @ 3..=6 => klondike::PileRef::Foundation(i as usize - 3),
+                    _ => return UIState::Selecting(self),
+                },
+            }),
+        }
+    }
+
+    fn handle_cancel(self) -> UIState {
+        match self {
+            SelectingState::Tableau { pile_n, .. } => {
+                UIState::Hovering(klondike::PileRef::Tableau(pile_n))
+            }
+        }
+    }
 }
 
 #[derive(Copy, Clone, Eq, PartialEq)]
@@ -387,7 +444,7 @@ impl State for MovingState {
     fn handle_interact(self, _: KeyModifiers, game_state: &mut GameStateOption) -> UIState {
         match game_state {
             GameStateOption::Playing(play_state) => {
-                match klondike::GameRules::move_cards(
+                return match klondike::GameRules::move_cards(
                     play_state.clone(),
                     self.src,
                     self.take_n,
@@ -395,13 +452,28 @@ impl State for MovingState {
                 ) {
                     Ok(result) => {
                         *game_state = GameStateOption::from(result);
-                        return UIState::Hovering(self.dst);
+                        UIState::Hovering(self.dst)
                     }
-                    Err(_) => return UIState::Hovering(self.src),
+                    Err(_) => UIState::Hovering(self.src),
                 }
             }
             _ => {}
         }
+        UIState::Hovering(self.src)
+    }
+
+    fn handle_goto(self, i: u8) -> UIState {
+        UIState::Moving(MovingState {
+            src: self.src,
+            take_n: self.take_n,
+            dst: match i {
+                i @ 3..=6 => klondike::PileRef::Foundation(i as usize - 3),
+                _ => return UIState::Moving(self),
+            },
+        })
+    }
+
+    fn handle_cancel(self) -> UIState {
         UIState::Hovering(self.src)
     }
 }

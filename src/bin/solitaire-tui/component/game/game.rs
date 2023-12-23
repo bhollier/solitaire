@@ -27,11 +27,6 @@ pub struct GameComponent {
 }
 
 impl<'a> Component for GameComponent {
-    fn init(&mut self) -> Result<()> {
-        self.reset();
-        Ok(())
-    }
-
     fn handle_event(&mut self, event: &Event) -> Result<()> {
         match event {
             Event::KeyPress(KeyCode::Up, m)
@@ -49,6 +44,15 @@ impl<'a> Component for GameComponent {
             Event::KeyPress(KeyCode::Enter, m) | Event::KeyPress(KeyCode::Char(' '), m) => {
                 self.handle_interact(*m)
             }
+            Event::KeyPress(KeyCode::Char(c @ '1'..='9'), _) => {
+                self.handle_goto(c.to_digit(10).unwrap())
+            }
+            Event::KeyPress(KeyCode::Char('c'), _) | Event::KeyPress(KeyCode::Char('C'), _) => {
+                self.handle_cancel()
+            }
+            Event::KeyPress(KeyCode::Char('r'), _) | Event::KeyPress(KeyCode::Char('R'), _) => {
+                self.handle_reset()
+            }
             _ => Ok(()),
         }
     }
@@ -61,15 +65,21 @@ impl<'a> Component for GameComponent {
             .title(
                 Title::from(match self.ui_state {
                     UIState::Hovering(pile) => match pile {
-                        HoveringState::Stock => "| navigate: ← ↑ ↓ → | draw: ␣ |",
-                        HoveringState::Talon => "| navigate: ← ↑ ↓ → | move: ⇧ + ← ↑ ↓ → |",
-                        HoveringState::Foundation(_) => "| navigate: ← ↑ ↓ → | move: ⇧ + ← ↑ ↓ → |",
+                        HoveringState::Stock => "| navigate: ← ↑ ↓ → | draw: ␣ | [r]estart |",
+                        HoveringState::Talon => {
+                            "| navigate: ← ↑ ↓ → | move: ⇧ + ← ↑ ↓ → | [r]estart |"
+                        }
+                        HoveringState::Foundation(_) => {
+                            "| navigate: ← ↑ ↓ → | move: ⇧ + ← ↑ ↓ → | [r]estart |"
+                        }
                         HoveringState::Tableau(_) => {
-                            "| navigate: ← ↑ ↓ → | move: ⇧ + ← → | take more: ⇧ + ↑ |"
+                            "| navigate: ← ↑ ↓ → | move: ⇧ + ← → | take more: ⇧ + ↑ | [r]estart |"
                         }
                     },
-                    UIState::Selecting(_) => "| take more: ⇧ + ↑ | take less: ↓ | move: ← → |",
-                    UIState::Moving(_) => "| move: ← ↑ ↓ → | place: ␣ |",
+                    UIState::Selecting(_) => {
+                        "| take more: ⇧ + ↑ | take less: ↓ | move: ← → | [c]ancel | [r]estart |"
+                    }
+                    UIState::Moving(_) => "| move: ← ↑ ↓ → | place: ␣ | [c]ancel | [r]estart |",
                 })
                 .position(Position::Bottom)
                 .alignment(Alignment::Left),
@@ -124,10 +134,21 @@ impl GameComponent {
         Ok(())
     }
 
-    fn reset(&mut self) {
+    fn handle_goto(&mut self, c: u32) -> Result<()> {
+        self.ui_state = self.ui_state.handle_goto(c as u8);
+        Ok(())
+    }
+
+    fn handle_cancel(&mut self) -> Result<()> {
+        self.ui_state = self.ui_state.handle_cancel();
+        Ok(())
+    }
+
+    fn handle_reset(&mut self) -> Result<()> {
         *self = GameComponent {
             state: klondike::GameStateOption::from(klondike::GameRules::new_and_deal()),
             ui_state: UIState::Hovering(HoveringState::Stock),
-        }
+        };
+        Ok(())
     }
 }

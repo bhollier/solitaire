@@ -11,11 +11,6 @@ pub struct AppComponent {
 }
 
 impl<'a> Component for AppComponent {
-    fn init(&mut self) -> Result<()> {
-        self.game.init()?;
-        Ok(())
-    }
-
     fn handle_event(&mut self, event: &Event) -> Result<()> {
         self.game.handle_event(event)?;
         Ok(())
