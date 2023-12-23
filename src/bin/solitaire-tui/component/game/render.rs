@@ -92,12 +92,16 @@ impl From<(&klondike::GameStateOption, &UIState)> for GameState {
 impl GameState {
     pub fn render(&self, f: &mut Frame, rect: Rect) {
         let width = CARD_WIDTH * klondike::NUM_TABLEAU as u16;
-        let horizontal_pad = rect.width.checked_sub(width).unwrap_or(0);
+        let padding = rect.width.checked_sub(width).unwrap_or(0) / 2;
 
         let inner_rect = Layout::default()
             .direction(Direction::Horizontal)
-            .constraints([Constraint::Length(width), Constraint::Min(horizontal_pad)])
-            .split(rect)[0];
+            .constraints([
+                Constraint::Min(padding),
+                Constraint::Length(width),
+                Constraint::Min(padding),
+            ])
+            .split(rect)[1];
 
         let vstack = Layout::default()
             .direction(Direction::Vertical)
