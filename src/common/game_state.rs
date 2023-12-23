@@ -1,5 +1,5 @@
 use crate as solitaire;
-use crate::{shuffle, Card, Deck, GameState, Stack, StackFrom};
+use crate::{shuffle, shuffle_with_rng, Card, Deck, GameState, Stack, StackFrom};
 
 /// "Standard" solitaire piles
 #[derive(Eq, PartialEq, Copy, Clone)]
@@ -49,6 +49,12 @@ impl<C: Card<N>, const N: usize> InitialGameState<C, N> {
     pub fn new() -> InitialGameState<C, N> {
         let mut d = C::new_deck();
         shuffle(&mut d);
+        InitialGameState::from(d)
+    }
+
+    pub fn new_with_rng<RNG: rand::Rng>(rng: &mut RNG) -> InitialGameState<C, N> {
+        let mut d = C::new_deck();
+        shuffle_with_rng(&mut d, rng);
         InitialGameState::from(d)
     }
 }
