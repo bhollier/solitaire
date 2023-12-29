@@ -11,14 +11,12 @@ pub struct AppComponent<RNG: rand::Rng> {
 }
 
 impl<RNG: rand::Rng> Component for AppComponent<RNG> {
-    fn handle_event(&mut self, event: &Event) -> Result<()> {
-        self.game.handle_event(event)?;
-        Ok(())
+    fn handle_event(&mut self, event: &Event) -> EventResult {
+        self.game.handle_event(event)
     }
 
     fn handle_tick(&mut self, dt: &std::time::Duration) -> Result<()> {
-        self.game.handle_tick(dt)?;
-        Ok(())
+        self.game.handle_tick(dt)
     }
 
     fn render(&self, f: &mut Frame, rect: Rect) {

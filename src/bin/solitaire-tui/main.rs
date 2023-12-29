@@ -49,8 +49,12 @@ fn main() -> Result<()> {
         match events.next()? {
             Message::Event(Event::KeyPress(KeyCode::Char('q'), _))
             | Message::Event(Event::KeyPress(KeyCode::Char('c'), KeyModifiers::CONTROL)) => break,
-            Message::Event(event) => app.handle_event(&event)?,
-            Message::Tick(dt) => app.handle_tick(&dt)?,
+            Message::Event(event) => {
+                app.handle_event(&event)?;
+            }
+            Message::Tick(dt) => {
+                app.handle_tick(&dt)?;
+            }
         }
     }
 

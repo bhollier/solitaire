@@ -3,7 +3,6 @@ use std::time::Duration;
 use crossterm::event::{KeyCode, KeyModifiers};
 use ratatui::{
     prelude::*,
-    symbols::line,
     widgets::{
         block::{Position, Title},
         Block, BorderType, Borders,
@@ -21,7 +20,7 @@ use crate::{
         Component,
     },
     error::Result,
-    event::Event,
+    event::{Event, EventResult, EventState},
 };
 
 pub struct GameComponent<RNG: rand::Rng> {
@@ -31,20 +30,28 @@ pub struct GameComponent<RNG: rand::Rng> {
 }
 
 impl<RNG: rand::Rng> Component for GameComponent<RNG> {
-    fn handle_event(&mut self, event: &Event) -> Result<()> {
+    fn handle_event(&mut self, event: &Event) -> EventResult {
         match event {
             Event::KeyPress(KeyCode::Up, m)
             | Event::KeyPress(KeyCode::Char('w'), m)
-            | Event::KeyPress(KeyCode::Char('W'), m) => self.handle_up(*m),
+            | Event::KeyPress(KeyCode::Char('W'), m) => {
+                self.handle_direction(ui_state::Direction::Up, *m)
+            }
             Event::KeyPress(KeyCode::Down, m)
             | Event::KeyPress(KeyCode::Char('s'), m)
-            | Event::KeyPress(KeyCode::Char('S'), m) => self.handle_down(*m),
+            | Event::KeyPress(KeyCode::Char('S'), m) => {
+                self.handle_direction(ui_state::Direction::Down, *m)
+            }
             Event::KeyPress(KeyCode::Left, m)
             | Event::KeyPress(KeyCode::Char('a'), m)
-            | Event::KeyPress(KeyCode::Char('A'), m) => self.handle_left(*m),
+            | Event::KeyPress(KeyCode::Char('A'), m) => {
+                self.handle_direction(ui_state::Direction::Left, *m)
+            }
             Event::KeyPress(KeyCode::Right, m)
             | Event::KeyPress(KeyCode::Char('d'), m)
-            | Event::KeyPress(KeyCode::Char('D'), m) => self.handle_right(*m),
+            | Event::KeyPress(KeyCode::Char('D'), m) => {
+                self.handle_direction(ui_state::Direction::Right, *m)
+            }
             Event::KeyPress(KeyCode::Enter, _) | Event::KeyPress(KeyCode::Char(' '), _) => {
                 self.handle_interact()
             }
@@ -57,7 +64,7 @@ impl<RNG: rand::Rng> Component for GameComponent<RNG> {
             Event::KeyPress(KeyCode::Char('r'), _) | Event::KeyPress(KeyCode::Char('R'), _) => {
                 self.handle_reset()
             }
-            _ => Ok(()),
+            _ => Ok(EventState::NotConsumed),
         }
     }
 
@@ -117,54 +124,35 @@ impl<RNG: rand::Rng> GameComponent<RNG> {
         }
     }
 
-    fn handle_up(&mut self, modifier: KeyModifiers) -> Result<()> {
-        self.ui_state =
-            self.ui_state
-                .handle_direction(ui_state::Direction::Up, modifier, &self.state);
-        Ok(())
+    fn handle_direction(
+        &mut self,
+        dir: ui_state::Direction,
+        modifier: KeyModifiers,
+    ) -> EventResult {
+        self.ui_state = self.ui_state.handle_direction(dir, modifier, &self.state);
+        Ok(EventState::Consumed)
     }
 
-    fn handle_down(&mut self, modifier: KeyModifiers) -> Result<()> {
-        self.ui_state =
-            self.ui_state
-                .handle_direction(ui_state::Direction::Down, modifier, &self.state);
-        Ok(())
-    }
-
-    fn handle_left(&mut self, modifier: KeyModifiers) -> Result<()> {
-        self.ui_state =
-            self.ui_state
-                .handle_direction(ui_state::Direction::Left, modifier, &self.state);
-        Ok(())
-    }
-
-    fn handle_right(&mut self, modifier: KeyModifiers) -> Result<()> {
-        self.ui_state =
-            self.ui_state
-                .handle_direction(ui_state::Direction::Right, modifier, &self.state);
-        Ok(())
-    }
-
-    fn handle_interact(&mut self) -> Result<()> {
+    fn handle_interact(&mut self) -> EventResult {
         self.ui_state = self.ui_state.handle_interact(&mut self.state);
-        Ok(())
+        Ok(EventState::Consumed)
     }
 
-    fn handle_goto(&mut self, c: u32) -> Result<()> {
+    fn handle_goto(&mut self, c: u32) -> EventResult {
         self.ui_state = self.ui_state.handle_goto(c as u8);
-        Ok(())
+        Ok(EventState::Consumed)
     }
 
-    fn handle_cancel(&mut self) -> Result<()> {
+    fn handle_cancel(&mut self) -> EventResult {
         self.ui_state = self.ui_state.handle_cancel();
-        Ok(())
+        Ok(EventState::Consumed)
     }
 
-    fn handle_reset(&mut self) -> Result<()> {
+    fn handle_reset(&mut self) -> EventResult {
         self.state = klondike::GameStateOption::from(klondike::InitialGameState::new_with_rng(
             &mut self.rng,
         ));
         self.ui_state = UIState::Dealing(DealingState::new());
-        Ok(())
+        Ok(EventState::Consumed)
     }
 }

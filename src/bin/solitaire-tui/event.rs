@@ -2,6 +2,8 @@ use std::{sync, thread, time::Instant};
 
 use crossterm::event;
 
+use crate::error::Error;
+
 #[derive(Copy, Clone)]
 pub enum Event {
     KeyPress(event::KeyCode, event::KeyModifiers),
@@ -28,6 +30,14 @@ pub enum Message {
     Event(Event),
     Tick(std::time::Duration),
 }
+
+#[derive(Copy, Clone)]
+pub enum EventState {
+    Consumed,
+    NotConsumed,
+}
+
+pub type EventResult = Result<EventState, Error>;
 
 pub struct Events {
     rx: sync::mpsc::Receiver<Message>,
