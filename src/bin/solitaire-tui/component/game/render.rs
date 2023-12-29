@@ -59,6 +59,7 @@ impl From<(&klondike::GameStateOption, &UIState)> for GameState {
 
         // Set the CardState correctly
         match ui_state {
+            UIState::Dealing(_) => {}
             UIState::Hovering(pile_ref) => {
                 let (ref mut pile, _) = piles.get_mut(&pile_ref).unwrap();
                 match pile.last_mut() {

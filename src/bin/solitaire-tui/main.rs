@@ -41,7 +41,7 @@ fn main() -> Result<()> {
     terminal.clear()?;
 
     let mut app = AppComponent::new(&rng);
-    let events = Events::new(250);
+    let events = Events::new(100);
 
     loop {
         terminal.draw(|f| app.render(f, f.size()))?;
@@ -50,7 +50,7 @@ fn main() -> Result<()> {
             Message::Event(Event::KeyPress(KeyCode::Char('q'), _))
             | Message::Event(Event::KeyPress(KeyCode::Char('c'), KeyModifiers::CONTROL)) => break,
             Message::Event(event) => app.handle_event(&event)?,
-            Message::Tick => {}
+            Message::Tick(dt) => app.handle_tick(&dt)?,
         }
     }
 

@@ -22,16 +22,22 @@ pub enum PileRef {
 
 impl solitaire::PileRef for PileRef {}
 
-/// Struct for the initial [GameState] with just the [Stock](PileRef::Stock) pile
+/// Struct for the initial [GameState] with just the [Stock](PileRef::Stock)
+/// and a (partially) dealt [Tableau](PileRef::Tableau)
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct InitialGameState<C: Card<N>, const N: usize> {
+pub struct InitialGameState<C: Card<NC>, const NC: usize, const NT: usize> {
+    /// The tableau, see [Tableau](PileRef::Tableau)
+    pub tableau: [Stack<C>; NT],
     /// The stock, see [Stock](PileRef::Stock)
     pub stock: Stack<C>,
 }
 
-impl<C: Card<N>, const N: usize> GameState<C, N, PileRef> for InitialGameState<C, N> {
+impl<C: Card<NC>, const NC: usize, const NT: usize> GameState<C, NC, PileRef>
+    for InitialGameState<C, NC, NT>
+{
     fn get_stack(&self, p: PileRef) -> Option<&Stack<C>> {
         match p {
+            PileRef::Tableau(n) => self.tableau.get(n),
             PileRef::Stock => Some(&self.stock),
             _ => None,
         }
@@ -39,29 +45,33 @@ impl<C: Card<N>, const N: usize> GameState<C, N, PileRef> for InitialGameState<C
 
     fn get_stack_mut(&mut self, p: PileRef) -> Option<&mut Stack<C>> {
         match p {
+            PileRef::Tableau(n) => self.tableau.get_mut(n),
             PileRef::Stock => Some(&mut self.stock),
             _ => None,
         }
     }
 }
 
-impl<C: Card<N>, const N: usize> InitialGameState<C, N> {
-    pub fn new() -> InitialGameState<C, N> {
+impl<C: Card<NC>, const NC: usize, const NT: usize> InitialGameState<C, NC, NT> {
+    pub fn new() -> InitialGameState<C, NC, NT> {
         let mut d = C::new_deck();
         shuffle(&mut d);
         InitialGameState::from(d)
     }
 
-    pub fn new_with_rng<RNG: rand::Rng>(rng: &mut RNG) -> InitialGameState<C, N> {
+    pub fn new_with_rng<RNG: rand::Rng>(rng: &mut RNG) -> InitialGameState<C, NC, NT> {
         let mut d = C::new_deck();
         shuffle_with_rng(&mut d, rng);
         InitialGameState::from(d)
     }
 }
 
-impl<C: Card<N>, const N: usize> From<Deck<C, N>> for InitialGameState<C, N> {
-    fn from(d: Deck<C, N>) -> Self {
+impl<C: Card<NC>, const NC: usize, const NT: usize> From<Deck<C, NC>>
+    for InitialGameState<C, NC, NT>
+{
+    fn from(d: Deck<C, NC>) -> Self {
         InitialGameState {
+            tableau: [(); NT].map(|_| Stack::new()),
             stock: Stack::from_slice(&d),
         }
     }
@@ -133,9 +143,20 @@ impl<'d, C: Card<NC>, const NC: usize, const NF: usize> GameState<C, NC, PileRef
 /// Enum for all possible [GameState]s
 #[derive(Clone, Eq, PartialEq)]
 pub enum GameStateOption<C: Card<NC>, const NC: usize, const NT: usize, const NF: usize> {
-    Initial(InitialGameState<C, NC>),
+    Initial(InitialGameState<C, NC, NT>),
     Playing(PlayingGameState<C, NC, NT, NF>),
     Win(WinGameState<C, NC, NF>),
+}
+
+impl<C: Card<NC>, const NC: usize, const NT: usize, const NF: usize> From<DealResult<C, NC, NT, NF>>
+    for GameStateOption<C, NC, NT, NF>
+{
+    fn from(value: DealResult<C, NC, NT, NF>) -> Self {
+        match value {
+            DealResult::Dealing(s) => GameStateOption::Initial(s),
+            DealResult::Complete(s) => GameStateOption::Playing(s),
+        }
+    }
 }
 
 impl<C: Card<NC>, const NC: usize, const NT: usize, const NF: usize> From<MoveResult<C, NC, NT, NF>>
@@ -169,10 +190,10 @@ impl<C: Card<NC>, const NC: usize, const NT: usize, const NF: usize> GameState<C
     }
 }
 
-impl<C: Card<NC>, const NC: usize, const NT: usize, const NF: usize> From<InitialGameState<C, NC>>
-    for GameStateOption<C, NC, NT, NF>
+impl<C: Card<NC>, const NC: usize, const NT: usize, const NF: usize>
+    From<InitialGameState<C, NC, NT>> for GameStateOption<C, NC, NT, NF>
 {
-    fn from(value: InitialGameState<C, NC>) -> Self {
+    fn from(value: InitialGameState<C, NC, NT>) -> Self {
         GameStateOption::Initial(value)
     }
 }
@@ -191,6 +212,14 @@ impl<C: Card<NC>, const NC: usize, const NT: usize, const NF: usize> From<WinGam
     fn from(value: WinGameState<C, NC, NF>) -> Self {
         GameStateOption::Win(value)
     }
+}
+
+/// Enum for the resulting [GameState] after a deal,
+/// either [Dealing](InitialGameState) (dealing not finished) or [Complete](PlayingGameState)
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum DealResult<C: Card<NC>, const NC: usize, const NT: usize, const NF: usize> {
+    Dealing(InitialGameState<C, NC, NT>),
+    Complete(PlayingGameState<C, NC, NT, NF>),
 }
 
 /// Enum for the resulting [GameState] after making a move,

@@ -1,4 +1,4 @@
-use std::{sync, thread};
+use std::{sync, thread, time::Instant};
 
 use crossterm::event;
 
@@ -26,7 +26,7 @@ impl From<event::Event> for Event {
 #[derive(Copy, Clone)]
 pub enum Message {
     Event(Event),
-    Tick,
+    Tick(std::time::Duration),
 }
 
 pub struct Events {
@@ -39,6 +39,7 @@ impl Events {
 
         {
             let tx = tx.clone();
+            let mut last_tick_instant = Instant::now();
             thread::spawn(move || loop {
                 if event::poll(std::time::Duration::from_millis(tick_rate)).unwrap() {
                     let event = Event::from(event::read().unwrap());
@@ -48,7 +49,10 @@ impl Events {
                         Err(_) => break,
                     }
                 }
-                match tx.send(Message::Tick) {
+                let now = Instant::now();
+                let dt = now.duration_since(last_tick_instant);
+                last_tick_instant = now;
+                match tx.send(Message::Tick(dt)) {
                     Ok(_) => {}
                     Err(_) => break,
                 }

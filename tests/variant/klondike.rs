@@ -1,12 +1,7 @@
 use solitaire::variant::klondike::*;
 use test_util::parse;
 
-/// Test the initial deal
-#[test]
-fn test_game_rules_deal() {
-    let deck: Deck = Card::new_deck();
-    let game = GameRules::deal(InitialGameState::from(deck));
-
+fn validate_deal_all_tableau(deck: &Deck, game: &PlayingGameState) {
     // Verify the cards were added to the tableau in the correct order
     let mut total_taken = 0;
     for (i, stack) in game.tableau.iter().enumerate() {
@@ -27,6 +22,73 @@ fn test_game_rules_deal() {
     // Verify the stock has the correct cards
     let expected_stock: Stack = deck[0..deck.len() - total_taken].iter().cloned().collect();
     assert_eq!(game.stock, expected_stock);
+}
+
+/// Test a single card deal
+#[test]
+fn test_game_rules_deal_one() {
+    let deck: Deck = Card::new_deck();
+    let mut game = InitialGameState::from(deck);
+
+    game = match GameRules::deal_one(game) {
+        DealResult::Dealing(s) => s,
+        DealResult::Complete(_) => panic!(),
+    };
+
+    {
+        assert_eq!(game.tableau[0].len(), 1);
+        let deck_card = &deck[deck.len() - 1];
+        assert_eq!(game.tableau[0][0].rank, deck_card.rank);
+        assert_eq!(game.tableau[0][0].suit, deck_card.suit);
+        assert!(game.tableau[0][0].face_up);
+
+        for tableau in &game.tableau[1..NUM_TABLEAU] {
+            assert!(tableau.is_empty());
+        }
+    }
+
+    game = match GameRules::deal_one(game) {
+        DealResult::Dealing(s) => s,
+        DealResult::Complete(_) => panic!(),
+    };
+
+    {
+        assert_eq!(game.tableau[0].len(), 1);
+        let deck_card = &deck[deck.len() - 1];
+        assert_eq!(game.tableau[0][0].rank, deck_card.rank);
+        assert_eq!(game.tableau[0][0].suit, deck_card.suit);
+        assert!(game.tableau[0][0].face_up);
+
+        assert_eq!(game.tableau[1].len(), 1);
+        let deck_card = &deck[deck.len() - 2];
+        assert_eq!(game.tableau[1][0].rank, deck_card.rank);
+        assert_eq!(game.tableau[1][0].suit, deck_card.suit);
+        assert!(!game.tableau[1][0].face_up);
+
+        for tableau in &game.tableau[2..NUM_TABLEAU] {
+            assert!(tableau.is_empty());
+        }
+    }
+
+    fn deal_all(mut g: InitialGameState) -> PlayingGameState {
+        loop {
+            match GameRules::deal_one(g) {
+                DealResult::Dealing(new_state) => g = new_state,
+                DealResult::Complete(new_state) => return new_state,
+            }
+        }
+    }
+
+    validate_deal_all_tableau(&deck, &deal_all(game))
+}
+
+/// Test the full initial deal
+#[test]
+fn test_game_rules_deal_all() {
+    let deck: Deck = Card::new_deck();
+    let game = GameRules::deal_all(InitialGameState::from(deck));
+
+    validate_deal_all_tableau(&deck, &game)
 }
 
 /// Test drawing from the stock pile

@@ -16,6 +16,11 @@ impl<RNG: rand::Rng> Component for AppComponent<RNG> {
         Ok(())
     }
 
+    fn handle_tick(&mut self, dt: &std::time::Duration) -> Result<()> {
+        self.game.handle_tick(dt)?;
+        Ok(())
+    }
+
     fn render(&self, f: &mut Frame, rect: Rect) {
         self.game.render(f, rect);
     }

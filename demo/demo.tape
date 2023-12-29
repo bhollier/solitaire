@@ -12,6 +12,9 @@ Set WindowBarSize 40
 Type@10ms "cargo run --package solitaire --bin solitaire-tui --features=tui -- --seed=42"
 Enter
 
+# Deal animation takes ~2.8 seconds
+Sleep 3s
+
 Sleep 2s
 
 Type @0.5s "s"

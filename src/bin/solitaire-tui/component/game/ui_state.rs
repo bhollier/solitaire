@@ -1,6 +1,11 @@
+use std::time::Duration;
+
 use crossterm::event::KeyModifiers;
 use solitaire::{
-    variant::{klondike, klondike::GameStateOption},
+    variant::{
+        klondike,
+        klondike::{DealResult, GameStateOption},
+    },
     GameState,
 };
 
@@ -15,6 +20,9 @@ pub enum Direction {
 /// Enum describing the various states the UI can be in
 #[derive(Copy, Clone, Eq, PartialEq)]
 pub enum UIState {
+    /// Animated dealing state at the start of a game
+    /// while the cards are being dealt onto the tableau
+    Dealing(DealingState),
     /// Default state, the user is hovering over a pile
     Hovering(HoveringState),
     /// The user is in the process of selecting one (or many) cards
@@ -23,7 +31,9 @@ pub enum UIState {
     Moving(MovingState),
 }
 
-pub trait State {
+pub trait State: Sized {
+    fn handle_tick(self, dt: &Duration, game_state: &mut GameStateOption) -> UIState;
+
     fn handle_direction(
         self,
         dir: Direction,
@@ -39,6 +49,15 @@ pub trait State {
 }
 
 impl State for UIState {
+    fn handle_tick(self, dt: &Duration, game_state: &mut GameStateOption) -> UIState {
+        match self {
+            UIState::Dealing(s) => s.handle_tick(dt, game_state),
+            UIState::Hovering(s) => s.handle_tick(dt, game_state),
+            UIState::Selecting(s) => s.handle_tick(dt, game_state),
+            UIState::Moving(s) => s.handle_tick(dt, game_state),
+        }
+    }
+
     fn handle_direction(
         self,
         dir: Direction,
@@ -46,6 +65,7 @@ impl State for UIState {
         game_state: &GameStateOption,
     ) -> UIState {
         match self {
+            UIState::Dealing(s) => s.handle_direction(dir, modifier, game_state),
             UIState::Hovering(s) => s.handle_direction(dir, modifier, game_state),
             UIState::Selecting(s) => s.handle_direction(dir, modifier, game_state),
             UIState::Moving(s) => s.handle_direction(dir, modifier, game_state),
@@ -54,6 +74,7 @@ impl State for UIState {
 
     fn handle_interact(self, game_state: &mut GameStateOption) -> UIState {
         match self {
+            UIState::Dealing(s) => s.handle_interact(game_state),
             UIState::Hovering(s) => s.handle_interact(game_state),
             UIState::Selecting(s) => s.handle_interact(game_state),
             UIState::Moving(s) => s.handle_interact(game_state),
@@ -62,6 +83,7 @@ impl State for UIState {
 
     fn handle_goto(self, i: u8) -> UIState {
         match self {
+            UIState::Dealing(s) => s.handle_goto(i),
             UIState::Hovering(s) => s.handle_goto(i),
             UIState::Selecting(s) => s.handle_goto(i),
             UIState::Moving(s) => s.handle_goto(i),
@@ -70,6 +92,7 @@ impl State for UIState {
 
     fn handle_cancel(self) -> UIState {
         match self {
+            UIState::Dealing(s) => s.handle_cancel(),
             UIState::Hovering(s) => s.handle_cancel(),
             UIState::Selecting(s) => s.handle_cancel(),
             UIState::Moving(s) => s.handle_cancel(),
@@ -77,9 +100,80 @@ impl State for UIState {
     }
 }
 
+#[derive(Copy, Clone, Eq, PartialEq)]
+pub struct DealingState {
+    since_last_deal: Duration,
+}
+
+impl DealingState {
+    const DEAL_INTERVAL: Duration = Duration::from_millis(100);
+
+    pub fn new() -> Self {
+        DealingState {
+            since_last_deal: Duration::from_secs(0),
+        }
+    }
+}
+
+impl State for DealingState {
+    fn handle_tick(self, dt: &Duration, game_state: &mut GameStateOption) -> UIState {
+        let mut since_last_deal = self.since_last_deal + *dt;
+        // Keep dealing until all the expected cards have been dealt,
+        // so that slow downs don't cause fewer cards to be dealt
+        while since_last_deal >= Self::DEAL_INTERVAL {
+            since_last_deal = since_last_deal - Self::DEAL_INTERVAL;
+            match game_state {
+                GameStateOption::Initial(initial) => {
+                    match klondike::GameRules::deal_one(initial.clone()) {
+                        DealResult::Dealing(new_state) => {
+                            *game_state = GameStateOption::from(new_state);
+                        }
+                        DealResult::Complete(new_state) => {
+                            *game_state = GameStateOption::from(new_state);
+                            // Deal complete, so move to hovering state
+                            return UIState::Hovering(HoveringState::Stock);
+                        }
+                    }
+                }
+                // Idiot check
+                _ => return UIState::Hovering(HoveringState::Stock),
+            }
+        }
+        UIState::Dealing(DealingState { since_last_deal })
+    }
+
+    fn handle_direction(self, _: Direction, _: KeyModifiers, _: &GameStateOption) -> UIState {
+        UIState::Dealing(self)
+    }
+
+    fn handle_interact(self, game_state: &mut GameStateOption) -> UIState {
+        // Interact skips dealing
+        match game_state {
+            GameStateOption::Initial(initial) => {
+                *game_state = GameStateOption::from(klondike::GameRules::deal_all(initial.clone()));
+            }
+            _ => {}
+        }
+        UIState::Hovering(HoveringState::Stock)
+    }
+
+    fn handle_goto(self, _: u8) -> UIState {
+        UIState::Dealing(self)
+    }
+
+    fn handle_cancel(self) -> UIState {
+        UIState::Dealing(self)
+    }
+}
+
 pub type HoveringState = klondike::PileRef;
 
 impl State for HoveringState {
+    fn handle_tick(self, _: &Duration, _: &mut GameStateOption) -> UIState {
+        // no-op
+        UIState::Hovering(self)
+    }
+
     fn handle_direction(
         self,
         dir: Direction,
@@ -279,6 +373,11 @@ pub enum SelectingState {
 }
 
 impl State for SelectingState {
+    fn handle_tick(self, _: &Duration, _: &mut GameStateOption) -> UIState {
+        // no-op
+        UIState::Selecting(self)
+    }
+
     fn handle_direction(
         self,
         dir: Direction,
@@ -403,6 +502,11 @@ pub struct MovingState {
 }
 
 impl State for MovingState {
+    fn handle_tick(self, _: &Duration, _: &mut GameStateOption) -> UIState {
+        // no-op
+        UIState::Moving(self)
+    }
+
     fn handle_direction(self, dir: Direction, _: KeyModifiers, _: &GameStateOption) -> UIState {
         let dst = match self.dst {
             // Shouldn't be possible, but handle it anyway

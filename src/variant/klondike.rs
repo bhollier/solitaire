@@ -12,7 +12,7 @@ pub const NUM_TABLEAU: usize = 7;
 pub const NUM_FOUNDATIONS: usize = FrenchSuit::N;
 
 /// The initial [GameState] for Klondike Solitaire with [common::Card]
-pub type InitialGameState = common::InitialGameState<Card, { Card::N }>;
+pub type InitialGameState = common::InitialGameState<Card, { Card::N }, NUM_TABLEAU>;
 
 /// The mid-game "playing" [GameState] for Klondike Solitaire with [common::Card]
 pub type PlayingGameState =
@@ -24,6 +24,10 @@ pub type WinGameState = common::WinGameState<Card, { Card::N }, NUM_FOUNDATIONS>
 /// Enum for all possible [GameState]s, for Klondike Solitaire with [Card]
 pub type GameStateOption = common::GameStateOption<Card, { Card::N }, NUM_TABLEAU, NUM_FOUNDATIONS>;
 
+/// Enum for the resulting [GameState] after a single deal,
+/// for Klondike Solitaire with [common::Card]
+pub type DealResult = common::DealResult<Card, { Card::N }, NUM_TABLEAU, NUM_FOUNDATIONS>;
+
 /// Enum for the resulting [GameState] after making a move,
 /// for Klondike Solitaire with [common::Card]
 pub type MoveResult = common::MoveResult<Card, { Card::N }, NUM_TABLEAU, NUM_FOUNDATIONS>;
@@ -32,38 +36,100 @@ pub type MoveResult = common::MoveResult<Card, { Card::N }, NUM_TABLEAU, NUM_FOU
 pub struct GameRules;
 
 impl GameRules {
-    /// Deals out the initial cards of a [InitialGameState],
-    /// returning a [PlayingGameState] with the result of the deal.
-    pub fn deal(state: InitialGameState) -> PlayingGameState {
-        let mut new_state = PlayingGameState {
-            tableau: [(); NUM_TABLEAU].map(|_| Stack::new()),
-            foundations: [(); NUM_FOUNDATIONS].map(|_| Stack::new()),
-            stock: state.stock,
-            talon: Stack::new(),
+    const DEAL_N: usize = NUM_TABLEAU * (NUM_TABLEAU + 1) / 2;
+
+    /// Deals out a single initial card of an [InitialGameState],
+    /// returning either an [InitialGameState] or a [PlayingGameState]
+    /// if the tableau has been built
+    pub fn deal_one(state: InitialGameState) -> DealResult {
+        let mut tableau = state.tableau;
+        let mut stock = state.stock;
+
+        let drawn = Card::N - stock.len();
+
+        // Figure out the tableau index using triangle numbers
+        // Tableau is a "top heavy" triangle so have to invert it
+        let card_triangle_num = Self::DEAL_N - drawn;
+        // Root is (-1 + √(1 + 8x + 1)) / 2
+        let card_triangle_root = (-1f64 + ((1 + (8 * card_triangle_num)) as f64).sqrt()) / 2f64;
+
+        // If the root is integral then this is a new row
+        let card_root_trunc = card_triangle_root.trunc();
+        let is_new_row = card_triangle_root == card_root_trunc;
+
+        // Calculate the triangle number of the row
+        let row_triangle_num = if is_new_row {
+            card_triangle_num
+        } else {
+            (card_root_trunc as usize + 1) * (card_root_trunc as usize + 2) / 2
         };
 
-        let mut card: Card;
-        for i in 0..NUM_TABLEAU {
-            for j in i..NUM_TABLEAU {
-                card = take_one_vec_mut(&mut new_state.stock);
-                new_state.tableau[j].push(card);
-            }
-            new_state.tableau[i].last_mut().unwrap().face_up = true;
-        }
+        // Calculate the tableau index
+        let tableau_index = (NUM_TABLEAU - card_triangle_root.ceil() as usize) + row_triangle_num
+            - card_triangle_num;
 
-        new_state
+        let mut card = take_one_vec_mut(&mut stock);
+        if is_new_row {
+            card.face_up = true
+        }
+        tableau[tableau_index].push(card);
+
+        if Card::N - stock.len() >= Self::DEAL_N {
+            DealResult::Complete(PlayingGameState {
+                tableau,
+                foundations: [(); NUM_FOUNDATIONS].map(|_| Stack::new()),
+                stock,
+                talon: Stack::new(),
+            })
+        } else {
+            DealResult::Dealing(InitialGameState { tableau, stock })
+        }
+    }
+
+    /// Deals out the initial cards of a [InitialGameState],
+    /// returning a [PlayingGameState] with the result of the deal.
+    pub fn deal_all(mut state: InitialGameState) -> PlayingGameState {
+        match Card::N - state.stock.len() {
+            // If the stock is empty, use nested for loops which are simpler and marginally more performant
+            0 => {
+                let mut new_state = PlayingGameState {
+                    tableau: [(); NUM_TABLEAU].map(|_| Stack::new()),
+                    foundations: [(); NUM_FOUNDATIONS].map(|_| Stack::new()),
+                    stock: state.stock,
+                    talon: Stack::new(),
+                };
+
+                let mut card: Card;
+                for i in 0..NUM_TABLEAU {
+                    for j in i..NUM_TABLEAU {
+                        card = take_one_vec_mut(&mut new_state.stock);
+                        new_state.tableau[j].push(card);
+                    }
+                    new_state.tableau[i].last_mut().unwrap().face_up = true;
+                }
+
+                new_state
+            }
+            // Otherwise use deal_one in a loop
+            _ => loop {
+                match Self::deal_one(state) {
+                    DealResult::Dealing(new_state) => state = new_state,
+                    DealResult::Complete(new_state) => return new_state,
+                }
+            },
+        }
     }
 
     /// Convenience function to create a new [InitialGameState]
     /// and then deal the cards with [deal](Self::deal)
     pub fn new_and_deal() -> PlayingGameState {
-        Self::deal(InitialGameState::new())
+        Self::deal_all(InitialGameState::new())
     }
 
     /// Convenience function to create a new [InitialGameState]
     /// with the given [rand::Rng] and then deal the cards with [deal](Self::deal)
     pub fn new_and_deal_with_rng<RNG: rand::Rng>(rng: &mut RNG) -> PlayingGameState {
-        Self::deal(InitialGameState::new_with_rng(rng))
+        Self::deal_all(InitialGameState::new_with_rng(rng))
     }
 
     /// Draws `n` cards from the [Stock](PileRef::Stock) onto the [Talon](PileRef::Talon).

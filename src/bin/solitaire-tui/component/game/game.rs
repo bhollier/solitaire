@@ -1,6 +1,9 @@
+use std::time::Duration;
+
 use crossterm::event::{KeyCode, KeyModifiers};
 use ratatui::{
     prelude::*,
+    symbols::line,
     widgets::{
         block::{Position, Title},
         Block, BorderType, Borders,
@@ -13,7 +16,7 @@ use crate::{
     component::{
         game::{
             render, ui_state,
-            ui_state::{HoveringState, State, UIState},
+            ui_state::{DealingState, HoveringState, State, UIState},
         },
         Component,
     },
@@ -58,30 +61,39 @@ impl<RNG: rand::Rng> Component for GameComponent<RNG> {
         }
     }
 
+    fn handle_tick(&mut self, dt: &Duration) -> Result<()> {
+        self.ui_state = self.ui_state.handle_tick(dt, &mut self.state);
+        Ok(())
+    }
+
     fn render(&self, f: &mut Frame, rect: Rect) {
         let outer = Block::default()
             .borders(Borders::ALL)
             .border_type(BorderType::Rounded)
             .title("Klondike")
             .title(
-                Title::from(match self.ui_state {
-                    UIState::Hovering(pile) => match pile {
-                        HoveringState::Stock => "| navigate: ← ↑ ↓ → | draw: ␣ | [r]estart |",
-                        HoveringState::Talon => {
-                            "| navigate: ← ↑ ↓ → | move: ⇧ + ← ↑ ↓ → | [r]estart |"
+                Title::from(format!(
+                    "┤ {} ├",
+                    match self.ui_state {
+                        UIState::Dealing(_) => "skip: ␣",
+                        UIState::Hovering(pile) => match pile {
+                            HoveringState::Stock => "navigate: ← ↑ ↓ → | draw: ␣ | [r]estart",
+                            HoveringState::Talon => {
+                                "navigate: ← ↑ ↓ → | move: ⇧ + ← ↑ ↓ → | [r]estart"
+                            }
+                            HoveringState::Foundation(_) => {
+                                "navigate: ← ↑ ↓ → | move: ⇧ + ← ↑ ↓ → | [r]estart"
+                            }
+                            HoveringState::Tableau(_) => {
+                                "navigate: ← ↑ ↓ → | move: ⇧ + ← → | take more: ⇧ + ↑ | [r]estart"
+                            }
+                        },
+                        UIState::Selecting(_) => {
+                            "take more: ⇧ + ↑ | take less: ↓ | move: ← → | [c]ancel | [r]estart"
                         }
-                        HoveringState::Foundation(_) => {
-                            "| navigate: ← ↑ ↓ → | move: ⇧ + ← ↑ ↓ → | [r]estart |"
-                        }
-                        HoveringState::Tableau(_) => {
-                            "| navigate: ← ↑ ↓ → | move: ⇧ + ← → | take more: ⇧ + ↑ | [r]estart |"
-                        }
-                    },
-                    UIState::Selecting(_) => {
-                        "| take more: ⇧ + ↑ | take less: ↓ | move: ← → | [c]ancel | [r]estart |"
+                        UIState::Moving(_) => "move: ← ↑ ↓ → | place: ␣ | [c]ancel | [r]estart",
                     }
-                    UIState::Moving(_) => "| move: ← ↑ ↓ → | place: ␣ | [c]ancel | [r]estart |",
-                })
+                ))
                 .position(Position::Bottom)
                 .alignment(Alignment::Left),
             );
@@ -97,11 +109,11 @@ impl<RNG: rand::Rng> Component for GameComponent<RNG> {
 impl<RNG: rand::Rng> GameComponent<RNG> {
     pub fn new(rng: RNG) -> GameComponent<RNG> {
         let mut rng = rng;
-        let state = klondike::GameRules::new_and_deal_with_rng(&mut rng);
+        let state = klondike::InitialGameState::new_with_rng(&mut rng);
         GameComponent {
             rng,
             state: klondike::GameStateOption::from(state),
-            ui_state: UIState::Hovering(HoveringState::Stock),
+            ui_state: UIState::Dealing(DealingState::new()),
         }
     }
 
@@ -149,10 +161,10 @@ impl<RNG: rand::Rng> GameComponent<RNG> {
     }
 
     fn handle_reset(&mut self) -> Result<()> {
-        self.state = klondike::GameStateOption::from(klondike::GameRules::new_and_deal_with_rng(
+        self.state = klondike::GameStateOption::from(klondike::InitialGameState::new_with_rng(
             &mut self.rng,
         ));
-        self.ui_state = UIState::Hovering(HoveringState::Stock);
+        self.ui_state = UIState::Dealing(DealingState::new());
         Ok(())
     }
 }
