@@ -256,7 +256,16 @@ impl State for HoveringState {
                                 }),
                             },
                             // Selecting tableau
-                            _ => UIState::Selecting(SelectingState::Tableau { pile_n, take_n: 2 }),
+                            _ => {
+                                let pile = game_state
+                                    .get_stack(klondike::PileRef::Tableau(pile_n))
+                                    .unwrap();
+                                // Cannot select a face down card
+                                if !pile.get(pile.len() - 2).unwrap().face_up {
+                                    return UIState::Hovering(self);
+                                }
+                                UIState::Selecting(SelectingState::Tableau { pile_n, take_n: 2 })
+                            }
                         },
                         // Left and right are tableaus
                         Direction::Left => match pile_n {
@@ -389,15 +398,17 @@ impl State for SelectingState {
                 Direction::Up => match modifier {
                     // Increase the cards selected
                     KeyModifiers::SHIFT => {
-                        let pile_len = game_state
+                        let pile = game_state
                             .get_stack(klondike::PileRef::Tableau(pile_n))
-                            .unwrap()
-                            .len();
+                            .unwrap();
                         // No more can be selected
-                        if pile_len == take_n {
+                        if pile.len() == take_n {
                             return UIState::Selecting(self);
                         }
-                        // todo validate the sequence
+                        // Cannot select a face down card
+                        if !pile.get(pile.len() - (take_n + 1)).unwrap().face_up {
+                            return UIState::Selecting(self);
+                        }
                         // Otherwise increase take_n by 1
                         UIState::Selecting(SelectingState::Tableau {
                             pile_n,
