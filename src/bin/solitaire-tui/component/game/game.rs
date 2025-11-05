@@ -14,7 +14,8 @@ use solitaire::variant::klondike;
 use crate::{
     component::{
         game::{
-            render, ui_state,
+            render::RenderState,
+            ui_state,
             ui_state::{DealingState, HoveringState, State, UIState},
         },
         Component,
@@ -27,6 +28,7 @@ pub struct GameComponent<RNG: rand::Rng> {
     rng: RNG,
     state: klondike::GameStateOption,
     ui_state: UIState,
+    last_render_state: Option<RenderState>,
 }
 
 impl<RNG: rand::Rng> Component for GameComponent<RNG> {
@@ -64,6 +66,7 @@ impl<RNG: rand::Rng> Component for GameComponent<RNG> {
             Event::KeyPress(KeyCode::Char('r'), _) | Event::KeyPress(KeyCode::Char('R'), _) => {
                 self.handle_reset()
             }
+            Event::MousePress(col, row, _) => self.handle_click(*col, *row),
             _ => Ok(EventState::NotConsumed),
         }
     }
@@ -73,7 +76,7 @@ impl<RNG: rand::Rng> Component for GameComponent<RNG> {
         Ok(())
     }
 
-    fn render(&self, f: &mut Frame, rect: Rect) {
+    fn render(&mut self, f: &mut Frame, rect: Rect) {
         let outer = Block::default()
             .borders(Borders::ALL)
             .border_type(BorderType::Rounded)
@@ -107,7 +110,9 @@ impl<RNG: rand::Rng> Component for GameComponent<RNG> {
 
         let inner_rect = outer.inner(rect);
 
-        render::GameState::from((&self.state, &self.ui_state)).render(f, inner_rect);
+        let render_state = RenderState::new(&self.state, &self.ui_state, inner_rect);
+        render_state.render(f);
+        self.last_render_state = Some(render_state);
 
         f.render_widget(outer, rect);
     }
@@ -121,6 +126,7 @@ impl<RNG: rand::Rng> GameComponent<RNG> {
             rng,
             state: klondike::GameStateOption::from(state),
             ui_state: UIState::Dealing(DealingState::new()),
+            last_render_state: None,
         }
     }
 
@@ -153,6 +159,18 @@ impl<RNG: rand::Rng> GameComponent<RNG> {
             &mut self.rng,
         ));
         self.ui_state = UIState::Dealing(DealingState::new());
+        Ok(EventState::Consumed)
+    }
+
+    fn handle_click(&mut self, col: u16, row: u16) -> EventResult {
+        let clicked_location = self
+            .last_render_state
+            .as_ref()
+            .and_then(|render_state| render_state.find_card_at(col, row))
+            .map(|(_, card_info)| &card_info.location);
+        self.ui_state = self
+            .ui_state
+            .handle_click(&mut self.state, clicked_location);
         Ok(EventState::Consumed)
     }
 }

@@ -9,6 +9,7 @@ use crossterm::{
     event::{KeyCode, KeyModifiers},
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
+    ExecutableCommand,
 };
 use rand::prelude::{SmallRng, *};
 use rand_seeder::Seeder;
@@ -36,12 +37,15 @@ fn main() -> Result<()> {
 
     enable_raw_mode()?;
     execute!(io::stdout(), EnterAlternateScreen)?;
+    let mouse_events = io::stdout()
+        .execute(crossterm::event::EnableMouseCapture)
+        .is_ok();
 
     let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
     terminal.clear()?;
 
     let mut app = AppComponent::new(&rng);
-    let events = Events::new(100);
+    let events = Events::new(std::time::Duration::from_millis(100));
 
     loop {
         terminal.draw(|f| app.render(f, f.size()))?;
@@ -58,6 +62,9 @@ fn main() -> Result<()> {
         }
     }
 
+    if mouse_events {
+        io::stdout().execute(crossterm::event::DisableMouseCapture)?;
+    }
     execute!(io::stdout(), LeaveAlternateScreen)?;
     disable_raw_mode()?;
     Ok(())

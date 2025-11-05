@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::rc::Rc;
 
 use ratatui::{layout::Rect, prelude::*, symbols::*, text::Text, widgets::*, Frame};
 use solitaire::{variant::klondike, GameState as GameStateTrait};
@@ -7,25 +8,58 @@ use crate::component::game::ui_state::{MovingState, SelectingState, UIState};
 
 const CARD_WIDTH: u16 = 10;
 const CARD_HEIGHT: u16 = 7;
+const TOTAL_WIDTH: u16 = CARD_WIDTH * klondike::NUM_TABLEAU as u16;
 
 /// The render states a card can be in
 #[derive(Copy, Clone, Eq, PartialEq)]
-enum CardState {
+pub enum CardVisualState {
     Normal,
     Selected,
     Moving,
 }
 
-/// A [Card](klondike::Card) with its [CardState] for rendering
-type Card = (klondike::Card, CardState);
-
-/// Represents a GameState as it should be rendered
-pub struct GameState {
-    piles: HashMap<klondike::PileRef, (Vec<Card>, bool)>,
+pub enum CardLocation {
+    Tableau(usize, usize),
+    Foundation(usize),
+    Stock,
+    Talon,
 }
 
-impl From<(&klondike::GameStateOption, &UIState)> for GameState {
-    fn from((game_state, ui_state): (&klondike::GameStateOption, &UIState)) -> Self {
+impl CardLocation {
+    pub fn pile_ref(&self) -> klondike::PileRef {
+        match self {
+            CardLocation::Tableau(p, _) => klondike::PileRef::Tableau(*p),
+            CardLocation::Foundation(p) => klondike::PileRef::Foundation(*p),
+            CardLocation::Stock => klondike::PileRef::Stock,
+            CardLocation::Talon => klondike::PileRef::Talon,
+        }
+    }
+
+    pub fn n_from_bottom(&self) -> Option<usize> {
+        match self {
+            CardLocation::Tableau(_, n) => Some(*n),
+            _ => None,
+        }
+    }
+}
+
+/// Render-specific information about a card
+pub struct CardInfo {
+    pub location: CardLocation,
+    visual_state: CardVisualState,
+    border: border::Set,
+    rect: Rect,
+    z: u64,
+}
+
+/// Represents the render state for a game
+pub struct RenderState {
+    // List of cards for drawing, ordered by Z index
+    draw_list: Vec<(Option<klondike::Card>, CardInfo)>,
+}
+
+impl RenderState {
+    pub fn new(game_state: &klondike::GameStateOption, ui_state: &UIState, rect: Rect) -> Self {
         let pile_refs = [klondike::PileRef::Stock, klondike::PileRef::Talon]
             .iter()
             .cloned()
@@ -43,63 +77,221 @@ impl From<(&klondike::GameStateOption, &UIState)> for GameState {
             )
             .collect::<Vec<_>>();
 
+        // Construct a simple hash map of piles with the visual states of each card
+        // according to the current game state
         let mut piles = HashMap::with_capacity(pile_refs.len());
-
+        let mut total_cards = 0;
         for p in pile_refs {
-            let is_selected = match ui_state {
-                UIState::Hovering(pile_ref) => pile_ref == &p,
-                _ => false,
-            };
             let stack = game_state.get_stack(p).map_or_else(
                 || Vec::new(),
-                |s| s.iter().cloned().map(|c| (c, CardState::Normal)).collect(),
+                |s| {
+                    s.iter()
+                        .cloned()
+                        // All cards are normal initially
+                        .map(|c| (c, CardVisualState::Normal))
+                        .collect()
+                },
             );
-            piles.insert(p, (stack, is_selected));
+            total_cards += stack.len();
+            piles.insert(p, stack);
         }
 
-        // Set the CardState correctly
+        // Update and move around cards based on the UI state
         match ui_state {
             UIState::Dealing(_) => {}
             UIState::Hovering(pile_ref) => {
-                let (ref mut pile, _) = piles.get_mut(&pile_ref).unwrap();
+                let pile = piles.get_mut(&pile_ref).unwrap();
                 match pile.last_mut() {
-                    Some((_, s)) => *s = CardState::Selected,
-                    _ => {}
+                    Some((_, s)) => *s = CardVisualState::Selected,
+                    _ => {} // Hovering over empty piles is handled later
                 }
             }
             UIState::Selecting(SelectingState::Tableau { pile_n, take_n }) => {
-                let (ref mut pile, _) =
-                    piles.get_mut(&klondike::PileRef::Tableau(*pile_n)).unwrap();
+                let pile = piles.get_mut(&klondike::PileRef::Tableau(*pile_n)).unwrap();
                 let pile_len = pile.len();
                 for (_, s) in &mut pile[pile_len - take_n..pile_len] {
-                    *s = CardState::Selected;
+                    *s = CardVisualState::Selected;
                 }
             }
+            UIState::Selecting(SelectingState::Talon) => {
+                let pile = piles.get_mut(&klondike::PileRef::Talon).unwrap();
+                let pile_len = pile.len();
+                pile[pile_len - 1].1 = CardVisualState::Selected;
+            }
             UIState::Moving(MovingState { src, take_n, dst }) => {
-                let (ref mut src, _) = piles.get_mut(&src).unwrap();
-                let mut take = solitaire::take_n_vec_mut(src, *take_n);
-                for (_, s) in &mut take {
-                    *s = CardState::Moving;
+                if dst != src {
+                    let src = piles.get_mut(&src).unwrap();
+                    let mut take = solitaire::take_n_vec_mut(src, *take_n);
+                    for (_, s) in &mut take {
+                        *s = CardVisualState::Moving;
+                    }
+                    let dst = piles.get_mut(&dst).unwrap();
+                    *dst = dst.iter().chain(take.iter()).cloned().collect()
                 }
-                let (ref mut dst, _) = piles.get_mut(&dst).unwrap();
-                *dst = dst.iter().chain(take.iter()).cloned().collect()
             }
         }
 
-        GameState { piles }
+        // Divide the rect into sub-rects for each area of the game
+        let layout = PileLayout::from(rect);
+
+        // Construct the draw list of cards, with the total cards as a hint for the capacity
+        // (the actual size will likely be a bit bigger than the total cards,
+        // since the draw list also needs elements for empty piles)
+        let mut draw_list = Vec::with_capacity(total_cards);
+
+        // Closure for adding to the draw list for "one card piles",
+        // i.e ones that are rendered as either having 1 or 0 cards
+        let mut add_one_card_pile = |location: CardLocation, rect: Rect| {
+            let pile = piles.get(&location.pile_ref()).unwrap();
+            let (card, visual_state) = pile.last().map_or_else(
+                // If there's no card, figure out the visual state from the UI state
+                || match ui_state {
+                    UIState::Hovering(p) if *p == location.pile_ref() => {
+                        (None, CardVisualState::Selected)
+                    }
+                    _ => (None, CardVisualState::Normal),
+                },
+                |(c, visual_state)| (Some(*c), *visual_state),
+            );
+            draw_list.push((
+                card,
+                CardInfo {
+                    location,
+                    visual_state,
+                    border: border::ROUNDED,
+                    rect,
+                    z: 0,
+                },
+            ));
+        };
+
+        add_one_card_pile(CardLocation::Stock, layout.stock);
+        add_one_card_pile(CardLocation::Talon, layout.talon);
+        for (i, rect) in layout.foundation.iter().cloned().enumerate() {
+            add_one_card_pile(CardLocation::Foundation(i), rect);
+        }
+
+        // Closure for adding to the draw list for a tableau pile
+        let mut add_tableau = |pile_n: usize, rect: Rect| {
+            let pile = piles.get(&klondike::PileRef::Tableau(pile_n)).unwrap();
+            if pile.is_empty() {
+                let visual_state = match ui_state {
+                    UIState::Hovering(p) if *p == klondike::PileRef::Tableau(pile_n) => {
+                        CardVisualState::Selected
+                    }
+                    _ => CardVisualState::Normal,
+                };
+
+                let by_padding = rect.height.checked_sub(CARD_HEIGHT).unwrap_or(0);
+
+                let rect = Layout::default()
+                    .direction(Direction::Vertical)
+                    .constraints([Constraint::Length(CARD_HEIGHT), Constraint::Min(by_padding)])
+                    .split(rect);
+
+                draw_list.push((
+                    None,
+                    CardInfo {
+                        location: CardLocation::Tableau(pile_n, 0),
+                        visual_state,
+                        border: border::ROUNDED,
+                        rect: rect[0],
+                        z: 0,
+                    },
+                ));
+            } else {
+                let mut ty_padding = 0;
+                for (i, &(c, visual_state)) in pile.iter().enumerate() {
+                    let border: border::Set = if i != 0 {
+                        border::Set {
+                            top_left: line::VERTICAL_RIGHT,
+                            top_right: line::VERTICAL_LEFT,
+                            ..border::ROUNDED
+                        }
+                    } else {
+                        border::ROUNDED
+                    };
+
+                    let by_padding = rect
+                        .height
+                        .checked_sub(ty_padding + CARD_HEIGHT)
+                        .unwrap_or(0);
+
+                    let rect = Layout::default()
+                        .direction(Direction::Vertical)
+                        .constraints([
+                            Constraint::Min(ty_padding),
+                            Constraint::Length(CARD_HEIGHT),
+                            Constraint::Min(by_padding),
+                        ])
+                        .split(rect);
+
+                    draw_list.push((
+                        Some(c),
+                        CardInfo {
+                            location: CardLocation::Tableau(pile_n, (pile.len() - 1) - i),
+                            visual_state,
+                            border,
+                            rect: rect[1],
+                            z: i as u64,
+                        },
+                    ));
+
+                    // Add 2 to the padding if the card is face up so the suit and rank are visible
+                    if c.face_up {
+                        ty_padding += 2
+
+                        // Only use 1 padding for face down cards to minimise space
+                    } else {
+                        ty_padding += 1
+                    }
+                }
+            }
+        };
+
+        for (i, rect) in layout.tableau.iter().cloned().enumerate() {
+            add_tableau(i, rect);
+        }
+
+        // Sort the draw list by Z index
+        draw_list.sort_by_key(|(_, card_info)| card_info.z);
+
+        RenderState { draw_list }
+    }
+
+    pub fn render(&self, f: &mut Frame) {
+        for (card, card_info) in self.draw_list.iter() {
+            render_card(card, card_info, f);
+        }
+    }
+
+    pub fn find_card_at(&self, col: u16, row: u16) -> Option<&(Option<klondike::Card>, CardInfo)> {
+        // Search in reverse order so that cards with a higher Z index are selected first
+        self.draw_list.iter().rev().find(|(_, card_info)| {
+            row >= card_info.rect.top()
+                && row <= card_info.rect.bottom()
+                && col >= card_info.rect.left()
+                && col <= card_info.rect.right()
+        })
     }
 }
 
-impl GameState {
-    pub fn render(&self, f: &mut Frame, rect: Rect) {
-        let width = CARD_WIDTH * klondike::NUM_TABLEAU as u16;
-        let padding = rect.width.checked_sub(width).unwrap_or(0) / 2;
+struct PileLayout {
+    tableau: Rc<[Rect]>,
+    foundation: Rc<[Rect]>,
+    stock: Rect,
+    talon: Rect,
+}
+
+impl From<Rect> for PileLayout {
+    fn from(rect: Rect) -> Self {
+        let padding = rect.width.checked_sub(TOTAL_WIDTH).unwrap_or(0) / 2;
 
         let inner_rect = Layout::default()
             .direction(Direction::Horizontal)
             .constraints([
                 Constraint::Min(padding),
-                Constraint::Length(width),
+                Constraint::Length(TOTAL_WIDTH),
                 Constraint::Min(padding),
             ])
             .split(rect)[1];
@@ -112,139 +304,47 @@ impl GameState {
             ])
             .split(inner_rect);
 
-        // Render the top row
-        {
-            let top = Layout::default()
-                .direction(Direction::Horizontal)
-                .constraints([
-                    Constraint::Length(CARD_WIDTH),
-                    // Talon is two widths wide
-                    Constraint::Length(CARD_WIDTH * 2),
-                    Constraint::Length(CARD_WIDTH),
-                    Constraint::Length(CARD_WIDTH),
-                    Constraint::Length(CARD_WIDTH),
-                    Constraint::Length(CARD_WIDTH),
-                ])
-                .split(vstack[0]);
+        let top = Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints([
+                Constraint::Length(CARD_WIDTH),
+                // Talon is two widths wide
+                Constraint::Length(CARD_WIDTH * 2),
+                Constraint::Length(CARD_WIDTH),
+                Constraint::Length(CARD_WIDTH),
+                Constraint::Length(CARD_WIDTH),
+                Constraint::Length(CARD_WIDTH),
+            ])
+            .split(vstack[0]);
 
-            self.render_stock(f, top[0]);
-            self.render_talon(f, top[1]);
+        let talon_rx_padding = top[1].width.checked_sub(CARD_WIDTH).unwrap_or(0);
 
-            for (i, foundation_rect) in top[2..6].iter().cloned().enumerate() {
-                self.render_foundation(i, f, foundation_rect);
-            }
-        }
+        let talon = Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints([
+                Constraint::Length(CARD_WIDTH),
+                Constraint::Min(talon_rx_padding),
+            ])
+            .split(top[1])[0];
 
-        // Render the tableau
         let tableau = Layout::default()
             .direction(Direction::Horizontal)
             .constraints([(); klondike::NUM_TABLEAU].map(|_| Constraint::Length(CARD_WIDTH)))
             .split(vstack[1]);
 
-        for (i, tableau_rect) in tableau.iter().cloned().enumerate() {
-            self.render_tableau(i, f, tableau_rect);
-        }
-    }
-
-    fn render_stock(&self, f: &mut Frame, rect: Rect) {
-        let (pile, is_selected) = self.piles.get(&klondike::PileRef::Stock).unwrap();
-
-        render_card(pile.last(), *is_selected, border::ROUNDED, f, rect);
-    }
-
-    fn render_talon(&self, f: &mut Frame, rect: Rect) {
-        let (pile, is_selected) = self.piles.get(&klondike::PileRef::Talon).unwrap();
-
-        // todo handle 3 card draw
-
-        let rx_padding = rect.width.checked_sub(CARD_WIDTH).unwrap_or(0);
-
-        let rect = Layout::default()
-            .direction(Direction::Horizontal)
-            .constraints([Constraint::Length(CARD_WIDTH), Constraint::Min(rx_padding)])
-            .split(rect);
-
-        render_card(pile.last(), *is_selected, border::ROUNDED, f, rect[0]);
-    }
-
-    fn render_foundation(&self, i: usize, f: &mut Frame, rect: Rect) {
-        let (pile, is_selected) = self.piles.get(&klondike::PileRef::Foundation(i)).unwrap();
-
-        render_card(pile.last(), *is_selected, border::ROUNDED, f, rect);
-    }
-
-    fn render_tableau(&self, i: usize, f: &mut Frame, rect: Rect) {
-        let (pile, is_selected) = self.piles.get(&klondike::PileRef::Tableau(i)).unwrap();
-
-        if pile.is_empty() {
-            let by_padding = rect.height.checked_sub(CARD_HEIGHT).unwrap_or(0);
-
-            let rect = Layout::default()
-                .direction(Direction::Vertical)
-                .constraints([Constraint::Length(CARD_HEIGHT), Constraint::Min(by_padding)])
-                .split(rect);
-
-            return render_card(None, *is_selected, border::ROUNDED, f, rect[0]);
-        }
-
-        let mut ty_padding = 0;
-        for (i, &(c, s)) in pile.iter().enumerate() {
-            let border_set: border::Set = if i != 0 {
-                border::Set {
-                    top_left: line::VERTICAL_RIGHT,
-                    top_right: line::VERTICAL_LEFT,
-                    ..border::ROUNDED
-                }
-            } else {
-                border::ROUNDED
-            };
-
-            let by_padding = rect
-                .height
-                .checked_sub(ty_padding + CARD_HEIGHT)
-                .unwrap_or(0);
-
-            let rect = Layout::default()
-                .direction(Direction::Vertical)
-                .constraints([
-                    Constraint::Min(ty_padding),
-                    Constraint::Length(CARD_HEIGHT),
-                    Constraint::Min(by_padding),
-                ])
-                .split(rect);
-
-            render_card(Some(&(c, s)), false, border_set, f, rect[1]);
-
-            // Add 2 to the padding if the card is face up so the suit and rank are visible
-            if c.face_up {
-                ty_padding += 2
-
-                // Only use 1 padding for face down cards to minimise space
-            } else {
-                ty_padding += 1
-            }
+        PileLayout {
+            tableau,
+            foundation: Rc::from(&top[2..6]),
+            stock: top[0],
+            talon,
         }
     }
 }
 
-fn render_card(
-    card: Option<&Card>,
-    is_selected: bool,
-    border_set: border::Set,
-    f: &mut Frame,
-    rect: Rect,
-) {
-    let state = card.map(|(_, s)| s).unwrap_or_else(|| {
-        if is_selected {
-            &CardState::Selected
-        } else {
-            &CardState::Normal
-        }
-    });
-
-    let border_color = if state == &CardState::Selected {
+fn render_card(card: &Option<klondike::Card>, card_info: &CardInfo, f: &mut Frame) {
+    let border_color = if card_info.visual_state == CardVisualState::Selected {
         Color::LightGreen
-    } else if state == &CardState::Moving {
+    } else if card_info.visual_state == CardVisualState::Moving {
         Color::LightYellow
     } else {
         Color::default()
@@ -252,20 +352,20 @@ fn render_card(
 
     let block = Block::default()
         .borders(Borders::ALL)
-        .border_set(border_set)
+        .border_set(card_info.border)
         .fg(border_color);
 
-    let inner_rect = block.inner(rect);
+    let inner_rect = block.inner(card_info.rect);
 
     match card {
-        Some((c, _)) => match c.face_up {
+        Some(c) => match c.face_up {
             true => f.render_widget(
                 Paragraph::new(Text::styled(
-                    card_to_str(c, inner_rect),
+                    card_to_str(&c, inner_rect),
                     Style::default().bg(Color::White).fg(card_to_color(c)),
                 ))
                 .block(block),
-                rect,
+                card_info.rect,
             ),
             false => f.render_widget(
                 Paragraph::new(Text::styled(
@@ -273,10 +373,10 @@ fn render_card(
                     Style::default().bg(Color::Red).fg(Color::LightRed),
                 ))
                 .block(block),
-                rect,
+                card_info.rect,
             ),
         },
-        None => f.render_widget(block, rect),
+        None => f.render_widget(block, card_info.rect),
     }
 }
 

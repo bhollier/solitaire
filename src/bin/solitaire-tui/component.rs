@@ -13,5 +13,5 @@ pub trait Component {
 
     fn handle_tick(&mut self, dt: &std::time::Duration) -> Result<()>;
 
-    fn render(&self, f: &mut Frame, rect: Rect);
+    fn render(&mut self, f: &mut Frame, rect: Rect);
 }

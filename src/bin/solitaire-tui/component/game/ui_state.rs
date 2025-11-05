@@ -1,5 +1,6 @@
 use std::time::Duration;
 
+use crate::component::game::render::CardLocation;
 use crossterm::event::KeyModifiers;
 use solitaire::{
     variant::{
@@ -46,6 +47,12 @@ pub trait State: Sized {
     fn handle_goto(self, i: u8) -> UIState;
 
     fn handle_cancel(self) -> UIState;
+
+    fn handle_click(
+        self,
+        game_state: &mut GameStateOption,
+        card_location: Option<&CardLocation>,
+    ) -> UIState;
 }
 
 impl State for UIState {
@@ -96,6 +103,19 @@ impl State for UIState {
             UIState::Hovering(s) => s.handle_cancel(),
             UIState::Selecting(s) => s.handle_cancel(),
             UIState::Moving(s) => s.handle_cancel(),
+        }
+    }
+
+    fn handle_click(
+        self,
+        game_state: &mut GameStateOption,
+        card_location: Option<&CardLocation>,
+    ) -> UIState {
+        match self {
+            UIState::Dealing(s) => s.handle_click(game_state, card_location),
+            UIState::Hovering(s) => s.handle_click(game_state, card_location),
+            UIState::Selecting(s) => s.handle_click(game_state, card_location),
+            UIState::Moving(s) => s.handle_click(game_state, card_location),
         }
     }
 }
@@ -164,6 +184,11 @@ impl State for DealingState {
     fn handle_cancel(self) -> UIState {
         UIState::Dealing(self)
     }
+
+    fn handle_click(self, game_state: &mut GameStateOption, _: Option<&CardLocation>) -> UIState {
+        // Clicking while dealing skips it, like with interacting
+        self.handle_interact(game_state)
+    }
 }
 
 pub type HoveringState = klondike::PileRef;
@@ -210,35 +235,8 @@ impl State for HoveringState {
                             dst: klondike::PileRef::Foundation(0),
                         }),
                     },
-                    // Moving foundation
-                    HoveringState::Foundation(pile_n) => match dir {
-                        // Up isn't possible
-                        Direction::Up => UIState::Hovering(self),
-                        // Down is tableau
-                        Direction::Down => UIState::Moving(MovingState {
-                            src: klondike::PileRef::Foundation(pile_n),
-                            take_n: 1,
-                            dst: klondike::PileRef::Tableau(pile_n + 3),
-                        }),
-                        // Left and right are foundations
-                        Direction::Left => match pile_n {
-                            // Cannot move to talon
-                            0 => UIState::Hovering(self),
-                            _ => UIState::Moving(MovingState {
-                                src: klondike::PileRef::Foundation(pile_n),
-                                take_n: 1,
-                                dst: klondike::PileRef::Foundation(pile_n - 1),
-                            }),
-                        },
-                        Direction::Right => match pile_n {
-                            3 => UIState::Hovering(self),
-                            _ => UIState::Moving(MovingState {
-                                src: klondike::PileRef::Foundation(pile_n),
-                                take_n: 1,
-                                dst: klondike::PileRef::Foundation(pile_n + 1),
-                            }),
-                        },
-                    },
+                    // Moving foundation isn't possible
+                    HoveringState::Foundation(_) => UIState::Hovering(self),
                     HoveringState::Tableau(pile_n) => match dir {
                         // Down isn't possible
                         Direction::Down => UIState::Hovering(self),
@@ -374,11 +372,71 @@ impl State for HoveringState {
         // no-op
         UIState::Hovering(self)
     }
+
+    fn handle_click(
+        self,
+        game_state: &mut GameStateOption,
+        card_location: Option<&CardLocation>,
+    ) -> UIState {
+        match card_location {
+            Some(location) => {
+                let pile_ref = location.pile_ref();
+                let pile = game_state.get_stack(pile_ref).unwrap();
+
+                // If the pile is empty and not the stock, just move
+                if pile.len() == 0 && pile_ref != klondike::PileRef::Stock {
+                    return UIState::Hovering(pile_ref);
+                }
+
+                match pile_ref {
+                    // Clicking the stock draws a new card
+                    klondike::PileRef::Stock => {
+                        match game_state {
+                            GameStateOption::Playing(play) => {
+                                match klondike::GameRules::draw_stock(play.clone(), 1) {
+                                    Ok(new_state) => {
+                                        *game_state = GameStateOption::Playing(new_state)
+                                    }
+                                    Err(_) => return UIState::Hovering(self),
+                                }
+                            }
+                            _ => {}
+                        }
+                        UIState::Hovering(klondike::PileRef::Stock)
+                    }
+                    // Selecting talon
+                    klondike::PileRef::Talon => UIState::Selecting(SelectingState::Talon),
+                    // Hovering foundation
+                    klondike::PileRef::Foundation(pile_n) => {
+                        UIState::Hovering(HoveringState::Foundation(pile_n))
+                    }
+                    // Selecting tableau
+                    klondike::PileRef::Tableau(pile_n) => {
+                        let take_n = location.n_from_bottom().unwrap();
+                        // Cannot select a face down card
+                        if !pile.get(pile.len() - (take_n + 1)).unwrap().face_up {
+                            return UIState::Selecting(SelectingState::Tableau {
+                                pile_n,
+                                take_n: 1,
+                            });
+                        }
+                        UIState::Selecting(SelectingState::Tableau {
+                            pile_n,
+                            take_n: take_n + 1,
+                        })
+                    }
+                }
+            }
+            // User didn't click a card, no-op
+            None => UIState::Hovering(self),
+        }
+    }
 }
 
 #[derive(Copy, Clone, Eq, PartialEq)]
 pub enum SelectingState {
     Tableau { pile_n: usize, take_n: usize },
+    Talon,
 }
 
 impl State for SelectingState {
@@ -457,6 +515,21 @@ impl State for SelectingState {
                     }),
                 },
             },
+            SelectingState::Talon => match dir {
+                // Up and left aren't possible
+                Direction::Up | Direction::Left => UIState::Selecting(self),
+                // Move the cards right/down
+                Direction::Right => UIState::Moving(MovingState {
+                    src: klondike::PileRef::Talon,
+                    take_n: 1,
+                    dst: klondike::PileRef::Foundation(0),
+                }),
+                Direction::Down => UIState::Moving(MovingState {
+                    src: klondike::PileRef::Talon,
+                    take_n: 1,
+                    dst: klondike::PileRef::Tableau(1),
+                }),
+            },
         }
     }
 
@@ -472,6 +545,19 @@ impl State for SelectingState {
                         Ok(new_state) => {
                             *game_state = GameStateOption::from(new_state);
                             UIState::Hovering(HoveringState::Tableau(pile_n))
+                        }
+                        Err(_) => UIState::Selecting(self),
+                    }
+                }
+                SelectingState::Talon => {
+                    match klondike::GameRules::auto_move_card(
+                        play.clone(),
+                        klondike::PileRef::Talon,
+                        1,
+                    ) {
+                        Ok(new_state) => {
+                            *game_state = GameStateOption::from(new_state);
+                            UIState::Hovering(HoveringState::Talon)
                         }
                         Err(_) => UIState::Selecting(self),
                     }
@@ -493,6 +579,7 @@ impl State for SelectingState {
                     _ => return UIState::Selecting(self),
                 },
             }),
+            _ => UIState::Selecting(self),
         }
     }
 
@@ -501,6 +588,99 @@ impl State for SelectingState {
             SelectingState::Tableau { pile_n, .. } => {
                 UIState::Hovering(klondike::PileRef::Tableau(pile_n))
             }
+            SelectingState::Talon => UIState::Hovering(klondike::PileRef::Talon),
+        }
+    }
+
+    fn handle_click(
+        self,
+        game_state: &mut GameStateOption,
+        card_location: Option<&CardLocation>,
+    ) -> UIState {
+        match card_location {
+            Some(location) => {
+                let pile_ref = location.pile_ref();
+
+                // If the user clicked the card that is already selected,
+                // treat that as an auto move
+                match game_state {
+                    GameStateOption::Playing(play) => match self {
+                        SelectingState::Talon if pile_ref == klondike::PileRef::Talon => {
+                            match klondike::GameRules::auto_move_card(play.clone(), pile_ref, 1) {
+                                Ok(new_state) => *game_state = GameStateOption::from(new_state),
+                                Err(_) => {}
+                            }
+                            return UIState::Hovering(pile_ref);
+                        }
+                        SelectingState::Tableau { pile_n, take_n }
+                            if pile_ref == klondike::PileRef::Tableau(pile_n)
+                                && take_n == location.n_from_bottom().unwrap() + 1 =>
+                        {
+                            match klondike::GameRules::auto_move_card(
+                                play.clone(),
+                                pile_ref,
+                                take_n,
+                            ) {
+                                Ok(new_state) => *game_state = GameStateOption::from(new_state),
+                                Err(_) => {}
+                            }
+                            return UIState::Hovering(pile_ref);
+                        }
+                        _ => {}
+                    },
+                    _ => {}
+                }
+
+                match pile_ref {
+                    // Clicking the stock draws a new card
+                    klondike::PileRef::Stock => {
+                        match game_state {
+                            GameStateOption::Playing(play) => {
+                                match klondike::GameRules::draw_stock(play.clone(), 1) {
+                                    Ok(new_state) => {
+                                        *game_state = GameStateOption::Playing(new_state)
+                                    }
+                                    Err(_) => return UIState::Selecting(self),
+                                }
+                            }
+                            _ => {}
+                        }
+                        UIState::Hovering(klondike::PileRef::Stock)
+                    }
+                    // Selecting talon
+                    klondike::PileRef::Talon => UIState::Selecting(SelectingState::Talon),
+                    // Moving to a pile
+                    klondike::PileRef::Foundation(_) | klondike::PileRef::Tableau(_) => {
+                        let (src, take_n) = match self {
+                            SelectingState::Tableau { pile_n, take_n } => {
+                                (klondike::PileRef::Tableau(pile_n), take_n)
+                            }
+                            SelectingState::Talon => (klondike::PileRef::Talon, 1),
+                        };
+                        match game_state {
+                            GameStateOption::Playing(play_state) => {
+                                match klondike::GameRules::move_cards(
+                                    play_state.clone(),
+                                    src,
+                                    take_n,
+                                    pile_ref,
+                                ) {
+                                    Ok(result) => {
+                                        *game_state = GameStateOption::from(result);
+                                        return UIState::Hovering(pile_ref);
+                                    }
+                                    Err(_) => {}
+                                }
+                            }
+                            _ => {}
+                        };
+                        // Defer to the logic when hovering
+                        UIState::Hovering(pile_ref).handle_click(game_state, card_location)
+                    }
+                }
+            }
+            // User didn't click a card, no-op
+            None => UIState::Selecting(self),
         }
     }
 }
@@ -608,5 +788,26 @@ impl State for MovingState {
 
     fn handle_cancel(self) -> UIState {
         UIState::Hovering(self.src)
+    }
+
+    fn handle_click(
+        self,
+        game_state: &mut GameStateOption,
+        card_location: Option<&CardLocation>,
+    ) -> UIState {
+        let selecting_state = match card_location {
+            Some(location) => match self.src {
+                klondike::PileRef::Talon => UIState::Selecting(SelectingState::Talon),
+                klondike::PileRef::Tableau(pile_n) => UIState::Selecting(SelectingState::Tableau {
+                    pile_n,
+                    take_n: location.n_from_bottom().unwrap() + 1,
+                }),
+                _ => return UIState::Moving(self),
+            },
+            None => return UIState::Moving(self),
+        };
+
+        // Defer to the selecting state logic
+        selecting_state.handle_click(game_state, card_location)
     }
 }

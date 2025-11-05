@@ -19,7 +19,7 @@ impl<RNG: rand::Rng> Component for AppComponent<RNG> {
         self.game.handle_tick(dt)
     }
 
-    fn render(&self, f: &mut Frame, rect: Rect) {
+    fn render(&mut self, f: &mut Frame, rect: Rect) {
         self.game.render(f, rect);
     }
 }
