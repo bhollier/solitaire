@@ -15,13 +15,13 @@ Enter
 # Deal animation takes ~2.8 seconds
 Sleep 3s
 
+# Auto takes a sec to move the two Aces
+Sleep 1s
+
 Sleep 2s
 
 Type @0.5s "s"
-Space @1s
 Type @0.5s "d"
-Space @1s
-
 Type @0.5s "d"
 Type @0.5s "d"
 Sleep 0.7s
