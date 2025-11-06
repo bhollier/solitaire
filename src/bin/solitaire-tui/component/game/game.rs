@@ -102,6 +102,7 @@ impl<RNG: rand::Rng> Component for GameComponent<RNG> {
                             "take more: ⇧ + ↑ | take less: ↓ | move: ← → | [c]ancel | [r]estart"
                         }
                         UIState::Moving(_) => "move: ← ↑ ↓ → | place: ␣ | [c]ancel | [r]estart",
+                        UIState::AutoMoving(_) => "auto moving...",
                     }
                 ))
                 .position(Position::Bottom)

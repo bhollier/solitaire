@@ -446,3 +446,47 @@ fn test_game_rules_move_cards_win() -> Result<()> {
 
     Ok(())
 }
+
+/// Test if it's safe to move a card to the foundation
+#[test]
+fn test_game_rules_is_safe_to_move_to_foundation() -> Result<()> {
+    let foundations = [
+        parse::cards(&vec!["AC", "2C", "3C"]),
+        parse::cards(&vec!["AS", "2S", "3S"]),
+        parse::cards(&vec!["AH", "2H", "3H", "4H"]),
+        parse::cards(&vec![]),
+    ];
+
+    // Card can't even be moved to a foundation
+    assert!(!GameRules::is_safe_to_move_to_foundation(
+        &parse::card("XC"),
+        &foundations,
+    ));
+
+    // Not safe to move
+    assert!(!GameRules::is_safe_to_move_to_foundation(
+        &parse::card("5H"),
+        &foundations,
+    ));
+
+    // Can always move Aces
+    assert!(GameRules::is_safe_to_move_to_foundation(
+        &parse::card("AD"),
+        &foundations,
+    ));
+
+    // Safe to move
+    let foundations = [
+        parse::cards(&vec!["AC", "2C", "3C"]),
+        parse::cards(&vec!["AS", "2S", "3S"]),
+        parse::cards(&vec!["AH", "2H"]),
+        parse::cards(&vec![]),
+    ];
+
+    assert!(GameRules::is_safe_to_move_to_foundation(
+        &parse::card("3H"),
+        &foundations,
+    ));
+
+    Ok(())
+}

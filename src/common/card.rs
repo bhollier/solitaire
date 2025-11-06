@@ -13,6 +13,15 @@ pub enum Color {
     Red,
 }
 
+impl Color {
+    pub fn opposite(&self) -> Self {
+        match self {
+            Color::Black => Color::Red,
+            Color::Red => Color::Black,
+        }
+    }
+}
+
 /// A classic "French" [Suit](solitaire::Suit), with "Clubs", "Spades", "Hearts" and "Diamonds"
 #[derive(Copy, Clone, Eq, PartialEq, Hash, EnumCountMacro)]
 pub enum FrenchSuit {

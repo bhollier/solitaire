@@ -380,6 +380,18 @@ impl GameRules {
         }
     }
 
+    /// Attempts to move `take_n` [Card]s from the stack at `src` and place them anywhere that
+    /// they can be moved.
+    /// See [GameRules::valid_seq] for rules on what card sequences are valid to move.
+    ///
+    /// # Arguments
+    ///
+    /// - `src`: The [PileRef] to move the cards from. Must be one of:
+    ///   - [Tableau](PileRef::Tableau)
+    ///   - [Foundation](PileRef::Foundation)
+    ///   - [Talon](PileRef::Talon)
+    /// - `take_n`: The total number of cards to take from `src`.
+    ///   Cannot be `0`, and if `src` is [Talon](PileRef::Talon) then must be `1`.
     pub fn auto_move_card(
         state: PlayingGameState,
         src: PileRef,
@@ -425,5 +437,82 @@ impl GameRules {
 
         // No where to move the card, so no-op
         Ok(MoveResult::Playing(state))
+    }
+
+    /// If the provided card is safe to be moved to one of the provided foundations, defined as
+    /// "both foundations for the opposite coloured suit have reached the card's rank - 1".
+    /// It is assumed that it is always safe to move an Ace or a Two.
+    /// Returns false if it's not possible to move the card to a foundation at all.
+    pub fn is_safe_to_move_to_foundation(
+        card_to_move: &Card,
+        foundations: &[Stack; NUM_FOUNDATIONS],
+    ) -> bool {
+        // Get the card's previous rank
+        // (using next() since it's ordered by how cards appear in the tableau)
+        let prev_rank = match card_to_move.rank.next() {
+            Some(rank) => rank,
+            // If there's no previous rank it must be an Ace, which is always safe to move
+            None => return true,
+        };
+        // Find the correct foundation to move the card to
+        let card_foundation = foundations
+            .iter()
+            .find(|foundation| match foundation.last() {
+                Some(c) => c.suit == card_to_move.suit && c.rank == *prev_rank,
+                None => false,
+            });
+        // Return false if the card can't even be moved to a foundation
+        if card_foundation.is_none() {
+            return false;
+        }
+        // A two is always safe (if there's somewhere to put it)
+        if card_to_move.rank == Rank::Two {
+            return true;
+        };
+        // Make sure the foundations for the opposite colour are safe
+        let mut foundation_matches: usize = 0;
+        for foundation in foundations {
+            let top = match foundation.last() {
+                Some(card) => card,
+                None => continue,
+            };
+            if top.suit.color() == card_to_move.suit.color().opposite() {
+                if top.rank <= *prev_rank {
+                    foundation_matches += 1;
+                } else {
+                    // The card can't be safe, exit
+                    return false;
+                }
+            }
+        }
+        foundation_matches == 2
+    }
+
+    /// Attempts to move any card from the tableau or talon and place them in the foundations.
+    /// Unlike [GameRules::auto_move_card], a card will only be moved to the foundation if it's
+    /// considered "safe" to do so; see [GameRules::is_safe_to_move_to_foundation] for rules on
+    /// what cards can be moved
+    pub fn auto_move_to_foundation(state: PlayingGameState) -> MoveResult {
+        // Consider the talon first, then the tableaus left to right
+        let piles = [PileRef::Talon]
+            .iter()
+            .cloned()
+            .chain((0..NUM_TABLEAU).map(|i| PileRef::Tableau(i)));
+
+        for pile_ref in piles {
+            // Get the top card, skipping empty stacks
+            let card = match state.get_stack(pile_ref).unwrap().last() {
+                Some(c) => c,
+                None => continue,
+            };
+            // is_safe_to_move_to_foundation validates both that the card is safe to move
+            // AND that it can be moved, so if it returns true we know to move it
+            if Self::is_safe_to_move_to_foundation(card, &state.foundations) {
+                return Self::auto_move_card(state, pile_ref, 1).unwrap();
+            }
+        }
+
+        // No matches, so just return the state back unchanged
+        MoveResult::Playing(state)
     }
 }

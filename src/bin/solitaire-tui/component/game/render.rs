@@ -129,6 +129,7 @@ impl RenderState {
                     *dst = dst.iter().chain(take.iter()).cloned().collect()
                 }
             }
+            UIState::AutoMoving(_) => {}
         }
 
         // Divide the rect into sub-rects for each area of the game

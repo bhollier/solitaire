@@ -30,6 +30,9 @@ pub enum UIState {
     Selecting(SelectingState),
     /// The user is moving their selected cards to another pile
     Moving(MovingState),
+    /// Animated auto move state when the game is moving
+    /// safe cards to the foundation automatically
+    AutoMoving(AutoMovingState),
 }
 
 pub trait State: Sized {
@@ -62,6 +65,7 @@ impl State for UIState {
             UIState::Hovering(s) => s.handle_tick(dt, game_state),
             UIState::Selecting(s) => s.handle_tick(dt, game_state),
             UIState::Moving(s) => s.handle_tick(dt, game_state),
+            UIState::AutoMoving(s) => s.handle_tick(dt, game_state),
         }
     }
 
@@ -76,6 +80,7 @@ impl State for UIState {
             UIState::Hovering(s) => s.handle_direction(dir, modifier, game_state),
             UIState::Selecting(s) => s.handle_direction(dir, modifier, game_state),
             UIState::Moving(s) => s.handle_direction(dir, modifier, game_state),
+            UIState::AutoMoving(s) => s.handle_direction(dir, modifier, game_state),
         }
     }
 
@@ -85,6 +90,7 @@ impl State for UIState {
             UIState::Hovering(s) => s.handle_interact(game_state),
             UIState::Selecting(s) => s.handle_interact(game_state),
             UIState::Moving(s) => s.handle_interact(game_state),
+            UIState::AutoMoving(s) => s.handle_interact(game_state),
         }
     }
 
@@ -94,6 +100,7 @@ impl State for UIState {
             UIState::Hovering(s) => s.handle_goto(i),
             UIState::Selecting(s) => s.handle_goto(i),
             UIState::Moving(s) => s.handle_goto(i),
+            UIState::AutoMoving(s) => s.handle_goto(i),
         }
     }
 
@@ -103,6 +110,7 @@ impl State for UIState {
             UIState::Hovering(s) => s.handle_cancel(),
             UIState::Selecting(s) => s.handle_cancel(),
             UIState::Moving(s) => s.handle_cancel(),
+            UIState::AutoMoving(s) => s.handle_cancel(),
         }
     }
 
@@ -116,6 +124,7 @@ impl State for UIState {
             UIState::Hovering(s) => s.handle_click(game_state, card_location),
             UIState::Selecting(s) => s.handle_click(game_state, card_location),
             UIState::Moving(s) => s.handle_click(game_state, card_location),
+            UIState::AutoMoving(s) => s.handle_click(game_state, card_location),
         }
     }
 }
@@ -150,7 +159,13 @@ impl State for DealingState {
                         }
                         DealResult::Complete(new_state) => {
                             *game_state = GameStateOption::from(new_state);
-                            // Deal complete, so move to hovering state
+                            // Deal complete so move to hovering state,
+                            // unless there's already an ace available to move
+                            if AutoMovingState::can_auto_move(game_state) {
+                                return UIState::AutoMoving(AutoMovingState::new(
+                                    HoveringState::Stock,
+                                ));
+                            }
                             return UIState::Hovering(HoveringState::Stock);
                         }
                     }
@@ -171,6 +186,9 @@ impl State for DealingState {
         match game_state {
             GameStateOption::Initial(initial) => {
                 *game_state = GameStateOption::from(klondike::GameRules::deal_all(initial.clone()));
+                if AutoMovingState::can_auto_move(game_state) {
+                    return UIState::AutoMoving(AutoMovingState::new(HoveringState::Stock));
+                }
             }
             _ => {}
         }
@@ -346,11 +364,21 @@ impl State for HoveringState {
         match game_state {
             GameStateOption::Playing(play) => match self {
                 HoveringState::Stock => match klondike::GameRules::draw_stock(play.clone(), 1) {
-                    Ok(new_state) => *game_state = GameStateOption::Playing(new_state),
+                    Ok(new_state) => {
+                        *game_state = GameStateOption::Playing(new_state);
+                        if AutoMovingState::can_auto_move(game_state) {
+                            return UIState::AutoMoving(AutoMovingState::new(self));
+                        }
+                    }
                     Err(_) => return UIState::Hovering(self),
                 },
                 p => match klondike::GameRules::auto_move_card(play.clone(), p, 1) {
-                    Ok(new_state) => *game_state = GameStateOption::from(new_state),
+                    Ok(new_state) => {
+                        *game_state = GameStateOption::from(new_state);
+                        if AutoMovingState::can_auto_move(game_state) {
+                            return UIState::AutoMoving(AutoMovingState::new(self));
+                        }
+                    }
                     Err(_) => return UIState::Hovering(self),
                 },
             },
@@ -395,7 +423,10 @@ impl State for HoveringState {
                             GameStateOption::Playing(play) => {
                                 match klondike::GameRules::draw_stock(play.clone(), 1) {
                                     Ok(new_state) => {
-                                        *game_state = GameStateOption::Playing(new_state)
+                                        *game_state = GameStateOption::Playing(new_state);
+                                        if AutoMovingState::can_auto_move(game_state) {
+                                            return UIState::AutoMoving(AutoMovingState::new(self));
+                                        }
                                     }
                                     Err(_) => return UIState::Hovering(self),
                                 }
@@ -544,6 +575,11 @@ impl State for SelectingState {
                     ) {
                         Ok(new_state) => {
                             *game_state = GameStateOption::from(new_state);
+                            if AutoMovingState::can_auto_move(game_state) {
+                                return UIState::AutoMoving(AutoMovingState::new(
+                                    klondike::PileRef::Tableau(pile_n),
+                                ));
+                            }
                             UIState::Hovering(HoveringState::Tableau(pile_n))
                         }
                         Err(_) => UIState::Selecting(self),
@@ -557,6 +593,11 @@ impl State for SelectingState {
                     ) {
                         Ok(new_state) => {
                             *game_state = GameStateOption::from(new_state);
+                            if AutoMovingState::can_auto_move(game_state) {
+                                return UIState::AutoMoving(AutoMovingState::new(
+                                    klondike::PileRef::Talon,
+                                ));
+                            }
                             UIState::Hovering(HoveringState::Talon)
                         }
                         Err(_) => UIState::Selecting(self),
@@ -607,7 +648,14 @@ impl State for SelectingState {
                     GameStateOption::Playing(play) => match self {
                         SelectingState::Talon if pile_ref == klondike::PileRef::Talon => {
                             match klondike::GameRules::auto_move_card(play.clone(), pile_ref, 1) {
-                                Ok(new_state) => *game_state = GameStateOption::from(new_state),
+                                Ok(new_state) => {
+                                    *game_state = GameStateOption::from(new_state);
+                                    if AutoMovingState::can_auto_move(game_state) {
+                                        return UIState::AutoMoving(AutoMovingState::new(
+                                            klondike::PileRef::Talon,
+                                        ));
+                                    }
+                                }
                                 Err(_) => {}
                             }
                             return UIState::Hovering(pile_ref);
@@ -621,7 +669,12 @@ impl State for SelectingState {
                                 pile_ref,
                                 take_n,
                             ) {
-                                Ok(new_state) => *game_state = GameStateOption::from(new_state),
+                                Ok(new_state) => {
+                                    *game_state = GameStateOption::from(new_state);
+                                    if AutoMovingState::can_auto_move(game_state) {
+                                        return UIState::AutoMoving(AutoMovingState::new(pile_ref));
+                                    }
+                                }
                                 Err(_) => {}
                             }
                             return UIState::Hovering(pile_ref);
@@ -638,7 +691,12 @@ impl State for SelectingState {
                             GameStateOption::Playing(play) => {
                                 match klondike::GameRules::draw_stock(play.clone(), 1) {
                                     Ok(new_state) => {
-                                        *game_state = GameStateOption::Playing(new_state)
+                                        *game_state = GameStateOption::Playing(new_state);
+                                        if AutoMovingState::can_auto_move(game_state) {
+                                            return UIState::AutoMoving(AutoMovingState::new(
+                                                klondike::PileRef::Stock,
+                                            ));
+                                        }
                                     }
                                     Err(_) => return UIState::Selecting(self),
                                 }
@@ -667,6 +725,11 @@ impl State for SelectingState {
                                 ) {
                                     Ok(result) => {
                                         *game_state = GameStateOption::from(result);
+                                        if AutoMovingState::can_auto_move(game_state) {
+                                            return UIState::AutoMoving(AutoMovingState::new(
+                                                pile_ref,
+                                            ));
+                                        }
                                         return UIState::Hovering(pile_ref);
                                     }
                                     Err(_) => {}
@@ -765,6 +828,9 @@ impl State for MovingState {
                 ) {
                     Ok(result) => {
                         *game_state = GameStateOption::from(result);
+                        if AutoMovingState::can_auto_move(game_state) {
+                            return UIState::AutoMoving(AutoMovingState::new(self.dst));
+                        }
                         UIState::Hovering(self.dst)
                     }
                     Err(_) => UIState::Hovering(self.src),
@@ -809,5 +875,97 @@ impl State for MovingState {
 
         // Defer to the selecting state logic
         selecting_state.handle_click(game_state, card_location)
+    }
+}
+
+#[derive(Copy, Clone, Eq, PartialEq)]
+pub struct AutoMovingState {
+    since_last_move: Duration,
+    prev_pile_ref: klondike::PileRef,
+}
+
+impl AutoMovingState {
+    const INITIAL_DELAY: Duration = Duration::from_millis(300);
+    const MOVE_INTERVAL: Duration = Duration::from_millis(400);
+
+    pub fn new(prev_pile_ref: klondike::PileRef) -> Self {
+        AutoMovingState {
+            since_last_move: Self::MOVE_INTERVAL - Self::INITIAL_DELAY,
+            prev_pile_ref,
+        }
+    }
+
+    fn can_auto_move(game_state: &GameStateOption) -> bool {
+        match game_state {
+            GameStateOption::Playing(play) => {
+                let new = klondike::GameRules::auto_move_to_foundation(play.clone());
+                match new {
+                    klondike::MoveResult::Playing(new) => play != &new,
+                    _ => true,
+                }
+            }
+            _ => false,
+        }
+    }
+}
+
+impl State for AutoMovingState {
+    fn handle_tick(self, dt: &Duration, game_state: &mut GameStateOption) -> UIState {
+        let mut since_last_move = self.since_last_move + *dt;
+        // Keep auto moving until the game state doesn't change or it's won,
+        // so that slow downs don't cause fewer cards to be dealt
+        while since_last_move >= Self::MOVE_INTERVAL {
+            since_last_move = since_last_move - Self::MOVE_INTERVAL;
+            match game_state {
+                GameStateOption::Playing(play) => {
+                    let new = klondike::GameRules::auto_move_to_foundation(play.clone());
+                    match new {
+                        klondike::MoveResult::Playing(new) => {
+                            // No change, so we're finished auto moving
+                            if play == &new {
+                                return UIState::Hovering(self.prev_pile_ref);
+                            } else {
+                                *game_state = GameStateOption::Playing(new);
+                            }
+                        }
+                        klondike::MoveResult::Win(win) => {
+                            *game_state = GameStateOption::Win(win);
+                            return UIState::Hovering(self.prev_pile_ref);
+                        }
+                    }
+                }
+                // Send the user back to hovering
+                _ => return UIState::Hovering(self.prev_pile_ref),
+            }
+        }
+        // Only continue auto moving if there's a card to auto move on the next run
+        if Self::can_auto_move(game_state) {
+            UIState::AutoMoving(AutoMovingState {
+                since_last_move,
+                ..self
+            })
+        } else {
+            UIState::Hovering(self.prev_pile_ref)
+        }
+    }
+
+    fn handle_direction(self, _: Direction, _: KeyModifiers, _: &GameStateOption) -> UIState {
+        UIState::AutoMoving(self)
+    }
+
+    fn handle_interact(self, _: &mut GameStateOption) -> UIState {
+        UIState::AutoMoving(self)
+    }
+
+    fn handle_goto(self, i: u8) -> UIState {
+        UIState::AutoMoving(self)
+    }
+
+    fn handle_cancel(self) -> UIState {
+        UIState::AutoMoving(self)
+    }
+
+    fn handle_click(self, _: &mut GameStateOption, _: Option<&CardLocation>) -> UIState {
+        UIState::AutoMoving(self)
     }
 }
