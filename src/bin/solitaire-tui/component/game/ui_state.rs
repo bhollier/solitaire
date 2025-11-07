@@ -1,3 +1,4 @@
+use std::cmp::max;
 use std::time::Duration;
 
 use crate::component::game::render::CardLocation;
@@ -881,16 +882,20 @@ impl State for MovingState {
 #[derive(Copy, Clone, Eq, PartialEq)]
 pub struct AutoMovingState {
     since_last_move: Duration,
+    interval: Duration,
     prev_pile_ref: klondike::PileRef,
 }
 
 impl AutoMovingState {
     const INITIAL_DELAY: Duration = Duration::from_millis(300);
-    const MOVE_INTERVAL: Duration = Duration::from_millis(400);
+    const INITIAL_MOVE_INTERVAL: Duration = Duration::from_millis(400);
+    const MOVE_INTERVAL_DECREASE: Duration = Duration::from_millis(25);
+    const MIN_MOVE_INTERVAL: Duration = Duration::from_millis(50);
 
     pub fn new(prev_pile_ref: klondike::PileRef) -> Self {
         AutoMovingState {
-            since_last_move: Self::MOVE_INTERVAL - Self::INITIAL_DELAY,
+            since_last_move: Self::INITIAL_MOVE_INTERVAL - Self::INITIAL_DELAY,
+            interval: Self::INITIAL_MOVE_INTERVAL,
             prev_pile_ref,
         }
     }
@@ -912,10 +917,15 @@ impl AutoMovingState {
 impl State for AutoMovingState {
     fn handle_tick(self, dt: &Duration, game_state: &mut GameStateOption) -> UIState {
         let mut since_last_move = self.since_last_move + *dt;
+        let mut interval = self.interval;
         // Keep auto moving until the game state doesn't change or it's won,
         // so that slow downs don't cause fewer cards to be dealt
-        while since_last_move >= Self::MOVE_INTERVAL {
-            since_last_move = since_last_move - Self::MOVE_INTERVAL;
+        while since_last_move >= interval {
+            since_last_move = since_last_move - interval;
+            interval = max(
+                interval.saturating_sub(Self::MOVE_INTERVAL_DECREASE),
+                Self::MIN_MOVE_INTERVAL,
+            );
             match game_state {
                 GameStateOption::Playing(play) => {
                     let new = klondike::GameRules::auto_move_to_foundation(play.clone());
@@ -942,6 +952,7 @@ impl State for AutoMovingState {
         if Self::can_auto_move(game_state) {
             UIState::AutoMoving(AutoMovingState {
                 since_last_move,
+                interval,
                 ..self
             })
         } else {
