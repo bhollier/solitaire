@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::rc::Rc;
 
-use ratatui::{layout::Rect, prelude::*, symbols::*, text::Text, widgets::*, Frame};
+use ratatui::{layout::Flex, layout::Rect, prelude::*, symbols::*, text::Text, widgets::*, Frame};
 use solitaire::{variant::klondike, GameState as GameStateTrait};
 
 use crate::component::game::ui_state::{MovingState, SelectingState, UIState};
@@ -54,8 +54,10 @@ pub struct CardInfo {
 
 /// Represents the render state for a game
 pub struct RenderState {
+    rect: Rect,
     // List of cards for drawing, ordered by Z index
     draw_list: Vec<(Option<klondike::Card>, CardInfo)>,
+    is_win: bool,
 }
 
 impl RenderState {
@@ -257,12 +259,30 @@ impl RenderState {
         // Sort the draw list by Z index
         draw_list.sort_by_key(|(_, card_info)| card_info.z);
 
-        RenderState { draw_list }
+        RenderState {
+            rect,
+            draw_list,
+            is_win: match game_state {
+                klondike::GameStateOption::Win(_) => true,
+                _ => false,
+            },
+        }
     }
 
     pub fn render(&self, f: &mut Frame) {
         for (card, card_info) in self.draw_list.iter() {
             render_card(card, card_info, f);
+        }
+        if self.is_win {
+            let text = Text::raw("You win!");
+            let [rect] = Layout::horizontal([Constraint::Length(text.width() as u16)])
+                .flex(Flex::Center)
+                .areas(self.rect);
+            let [rect] = Layout::vertical([Constraint::Length(1)])
+                .flex(Flex::Center)
+                .areas(rect);
+            f.render_widget(Clear, rect);
+            f.render_widget(text, rect);
         }
     }
 
@@ -299,10 +319,7 @@ impl From<Rect> for PileLayout {
 
         let vstack = Layout::default()
             .direction(Direction::Vertical)
-            .constraints([
-                Constraint::Length(CARD_HEIGHT),
-                Constraint::Length(CARD_HEIGHT * 3),
-            ])
+            .constraints([Constraint::Length(CARD_HEIGHT), Constraint::Fill(1)])
             .split(inner_rect);
 
         let top = Layout::default()
