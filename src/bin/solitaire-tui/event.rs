@@ -1,58 +1,76 @@
 use std::{sync, thread, time::Instant};
 
-use crossterm::event;
-
-use crate::error::Error;
-
-#[derive(Copy, Clone)]
-pub enum Event {
-    KeyPress(event::KeyCode, event::KeyModifiers),
-    MousePress(u16, u16, event::KeyModifiers),
-    Unknown,
-}
-
-impl From<event::Event> for Event {
-    fn from(event: event::Event) -> Self {
-        match event {
-            event::Event::Key(key_event) => match key_event {
-                event::KeyEvent {
-                    kind: event::KeyEventKind::Press,
-                    ..
-                } => Event::KeyPress(key_event.code, key_event.modifiers),
-                _ => Event::Unknown,
-            },
-            event::Event::Mouse(mouse_event) => match mouse_event {
-                event::MouseEvent {
-                    kind: event::MouseEventKind::Down(_),
-                    ..
-                } => Event::MousePress(mouse_event.column, mouse_event.row, mouse_event.modifiers),
-                _ => Event::Unknown,
-            },
-            _ => Event::Unknown,
-        }
-    }
-}
+use solitaire::ui;
 
 #[derive(Copy, Clone)]
 pub enum Message {
-    Event(Event),
-    Tick(std::time::Duration),
+    Event(ui::event::Event),
+    Tick(web_time::Duration),
 }
 
-#[derive(Copy, Clone)]
-pub enum EventState {
-    Consumed,
-    NotConsumed,
+fn convert_key_code(key_code: crossterm::event::KeyCode) -> ui::event::KeyCode {
+    match key_code {
+        crossterm::event::KeyCode::Backspace => ui::event::KeyCode::Backspace,
+        crossterm::event::KeyCode::Enter => ui::event::KeyCode::Enter,
+        crossterm::event::KeyCode::Left => ui::event::KeyCode::Left,
+        crossterm::event::KeyCode::Right => ui::event::KeyCode::Right,
+        crossterm::event::KeyCode::Up => ui::event::KeyCode::Up,
+        crossterm::event::KeyCode::Down => ui::event::KeyCode::Down,
+        crossterm::event::KeyCode::Home => ui::event::KeyCode::Home,
+        crossterm::event::KeyCode::End => ui::event::KeyCode::End,
+        crossterm::event::KeyCode::PageUp => ui::event::KeyCode::PageUp,
+        crossterm::event::KeyCode::PageDown => ui::event::KeyCode::PageDown,
+        crossterm::event::KeyCode::Tab => ui::event::KeyCode::Tab,
+        crossterm::event::KeyCode::BackTab => ui::event::KeyCode::Tab,
+        crossterm::event::KeyCode::Delete => ui::event::KeyCode::Delete,
+        crossterm::event::KeyCode::F(n) => ui::event::KeyCode::F(n),
+        crossterm::event::KeyCode::Char(c) => ui::event::KeyCode::Char(c),
+        crossterm::event::KeyCode::Esc => ui::event::KeyCode::Esc,
+        _ => ui::event::KeyCode::Unknown,
+    }
 }
 
-pub type EventResult = Result<EventState, Error>;
+fn convert_modifiers(modifiers: crossterm::event::KeyModifiers) -> ui::event::Modifiers {
+    ui::event::Modifiers {
+        shift: modifiers.contains(crossterm::event::KeyModifiers::SHIFT),
+        ctrl: modifiers.contains(crossterm::event::KeyModifiers::CONTROL),
+        alt: modifiers.contains(crossterm::event::KeyModifiers::ALT),
+    }
+}
+
+fn convert_event(event: crossterm::event::Event) -> ui::event::Event {
+    match event {
+        crossterm::event::Event::Key(key_event) => match key_event {
+            crossterm::event::KeyEvent {
+                kind: crossterm::event::KeyEventKind::Press,
+                ..
+            } => ui::event::Event::KeyPress(
+                convert_key_code(key_event.code),
+                convert_modifiers(key_event.modifiers),
+            ),
+            _ => ui::event::Event::Unknown,
+        },
+        crossterm::event::Event::Mouse(mouse_event) => match mouse_event {
+            crossterm::event::MouseEvent {
+                kind: crossterm::event::MouseEventKind::Down(_),
+                ..
+            } => ui::event::Event::MousePress(
+                mouse_event.column,
+                mouse_event.row,
+                convert_modifiers(mouse_event.modifiers),
+            ),
+            _ => ui::event::Event::Unknown,
+        },
+        _ => ui::event::Event::Unknown,
+    }
+}
 
 pub struct Events {
     rx: sync::mpsc::Receiver<Message>,
 }
 
 impl Events {
-    pub fn new(tick_rate: std::time::Duration) -> Events {
+    pub fn new(tick_rate: web_time::Duration) -> Events {
         let (tx, rx) = sync::mpsc::channel();
 
         {
@@ -62,11 +80,11 @@ impl Events {
                 let timeout =
                     (last_tick_instant + tick_rate).saturating_duration_since(Instant::now());
 
-                if event::poll(timeout).unwrap() {
+                if crossterm::event::poll(timeout).unwrap() {
                     loop {
-                        let event = Event::from(event::read().unwrap());
+                        let event = convert_event(crossterm::event::read().unwrap());
                         match event {
-                            Event::Unknown => {}
+                            ui::event::Event::Unknown => {}
                             event => {
                                 match tx.send(Message::Event(event)) {
                                     Ok(_) => {}
@@ -76,7 +94,7 @@ impl Events {
                             }
                         };
                         // Keep polling only for events that are immediately available
-                        if !event::poll(std::time::Duration::from_millis(0)).unwrap() {
+                        if !crossterm::event::poll(web_time::Duration::from_millis(0)).unwrap() {
                             break;
                         }
                     }

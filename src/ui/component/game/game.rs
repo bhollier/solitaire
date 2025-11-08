@@ -1,6 +1,6 @@
-use std::time::Duration;
+use web_time::Duration;
 
-use crossterm::event::{KeyCode, KeyModifiers};
+use crate::variant::klondike;
 use ratatui::{
     prelude::*,
     widgets::{
@@ -9,10 +9,9 @@ use ratatui::{
     },
     Frame,
 };
-use solitaire::variant::klondike;
 
 use crate::{
-    component::{
+    ui::component::{
         game::{
             render::RenderState,
             ui_state,
@@ -20,8 +19,8 @@ use crate::{
         },
         Component,
     },
-    error::Result,
-    event::{Event, EventResult, EventState},
+    ui::error::Result,
+    ui::event::{Event, EventResult, EventState, KeyCode, Modifiers},
 };
 
 pub struct GameComponent<RNG: rand::Rng> {
@@ -131,11 +130,7 @@ impl<RNG: rand::Rng> GameComponent<RNG> {
         }
     }
 
-    fn handle_direction(
-        &mut self,
-        dir: ui_state::Direction,
-        modifier: KeyModifiers,
-    ) -> EventResult {
+    fn handle_direction(&mut self, dir: ui_state::Direction, modifier: Modifiers) -> EventResult {
         self.ui_state = self.ui_state.handle_direction(dir, modifier, &self.state);
         Ok(EventState::Consumed)
     }

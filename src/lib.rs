@@ -6,3 +6,6 @@ pub use game_state::*;
 
 pub mod common;
 pub mod variant;
+
+#[cfg(feature = "ui")]
+pub mod ui;

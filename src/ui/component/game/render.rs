@@ -1,10 +1,10 @@
 use std::collections::HashMap;
 use std::rc::Rc;
 
+use crate::{variant::klondike, GameState as GameStateTrait};
 use ratatui::{layout::Flex, layout::Rect, prelude::*, symbols::*, text::Text, widgets::*, Frame};
-use solitaire::{variant::klondike, GameState as GameStateTrait};
 
-use crate::component::game::ui_state::{MovingState, SelectingState, UIState};
+use crate::ui::component::game::ui_state::{MovingState, SelectingState, UIState};
 
 const CARD_WIDTH: u16 = 10;
 const CARD_HEIGHT: u16 = 7;
@@ -123,7 +123,7 @@ impl RenderState {
             UIState::Moving(MovingState { src, take_n, dst }) => {
                 if dst != src {
                     let src = piles.get_mut(&src).unwrap();
-                    let mut take = solitaire::take_n_vec_mut(src, *take_n);
+                    let mut take = crate::take_n_vec_mut(src, *take_n);
                     for (_, s) in &mut take {
                         *s = CardVisualState::Moving;
                     }

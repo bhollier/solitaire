@@ -1,9 +1,9 @@
 use ratatui::{layout::Rect, Frame};
 
 use crate::{
-    component::{game::GameComponent, *},
-    error::Result,
-    event::Event,
+    ui::component::{game::GameComponent, *},
+    ui::error::Result,
+    ui::event::Event,
 };
 
 pub struct AppComponent<RNG: rand::Rng> {
@@ -15,7 +15,7 @@ impl<RNG: rand::Rng> Component for AppComponent<RNG> {
         self.game.handle_event(event)
     }
 
-    fn handle_tick(&mut self, dt: &std::time::Duration) -> Result<()> {
+    fn handle_tick(&mut self, dt: &web_time::Duration) -> Result<()> {
         self.game.handle_tick(dt)
     }
 

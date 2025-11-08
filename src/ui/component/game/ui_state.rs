@@ -1,9 +1,9 @@
 use std::cmp::max;
-use std::time::Duration;
+use web_time::Duration;
 
-use crate::component::game::render::CardLocation;
-use crossterm::event::KeyModifiers;
-use solitaire::{
+use crate::ui::component::game::render::CardLocation;
+use crate::ui::event::Modifiers;
+use crate::{
     variant::{
         klondike,
         klondike::{DealResult, GameStateOption},
@@ -42,7 +42,7 @@ pub trait State: Sized {
     fn handle_direction(
         self,
         dir: Direction,
-        modifier: KeyModifiers,
+        modifier: Modifiers,
         game_state: &GameStateOption,
     ) -> UIState;
 
@@ -73,7 +73,7 @@ impl State for UIState {
     fn handle_direction(
         self,
         dir: Direction,
-        modifier: KeyModifiers,
+        modifier: Modifiers,
         game_state: &GameStateOption,
     ) -> UIState {
         match self {
@@ -178,7 +178,7 @@ impl State for DealingState {
         UIState::Dealing(DealingState { since_last_deal })
     }
 
-    fn handle_direction(self, _: Direction, _: KeyModifiers, _: &GameStateOption) -> UIState {
+    fn handle_direction(self, _: Direction, _: Modifiers, _: &GameStateOption) -> UIState {
         UIState::Dealing(self)
     }
 
@@ -221,12 +221,12 @@ impl State for HoveringState {
     fn handle_direction(
         self,
         dir: Direction,
-        modifier: KeyModifiers,
+        modifier: Modifiers,
         game_state: &GameStateOption,
     ) -> UIState {
         match modifier {
             // Selection mode
-            KeyModifiers::SHIFT => {
+            Modifiers { shift: true, .. } => {
                 let pile_len = game_state.get_stack(self).unwrap().len();
 
                 // Do nothing on an empty pile
@@ -480,14 +480,14 @@ impl State for SelectingState {
     fn handle_direction(
         self,
         dir: Direction,
-        modifier: KeyModifiers,
+        modifier: Modifiers,
         game_state: &GameStateOption,
     ) -> UIState {
         match self {
             SelectingState::Tableau { pile_n, take_n } => match dir {
                 Direction::Up => match modifier {
                     // Increase the cards selected
-                    KeyModifiers::SHIFT => {
+                    Modifiers { shift: true, .. } => {
                         let pile = game_state
                             .get_stack(klondike::PileRef::Tableau(pile_n))
                             .unwrap();
@@ -762,7 +762,7 @@ impl State for MovingState {
         UIState::Moving(self)
     }
 
-    fn handle_direction(self, dir: Direction, _: KeyModifiers, _: &GameStateOption) -> UIState {
+    fn handle_direction(self, dir: Direction, _: Modifiers, _: &GameStateOption) -> UIState {
         let dst = match self.dst {
             // Shouldn't be possible, but handle it anyway
             klondike::PileRef::Stock => match dir {
@@ -960,7 +960,7 @@ impl State for AutoMovingState {
         }
     }
 
-    fn handle_direction(self, _: Direction, _: KeyModifiers, _: &GameStateOption) -> UIState {
+    fn handle_direction(self, _: Direction, _: Modifiers, _: &GameStateOption) -> UIState {
         UIState::AutoMoving(self)
     }
 
@@ -968,7 +968,7 @@ impl State for AutoMovingState {
         UIState::AutoMoving(self)
     }
 
-    fn handle_goto(self, i: u8) -> UIState {
+    fn handle_goto(self, _: u8) -> UIState {
         UIState::AutoMoving(self)
     }
 

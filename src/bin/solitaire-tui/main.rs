@@ -1,12 +1,9 @@
-mod component;
-mod error;
 mod event;
 
 use std::io;
 
 use clap::Parser;
 use crossterm::{
-    event::{KeyCode, KeyModifiers},
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
     ExecutableCommand,
@@ -15,11 +12,9 @@ use rand::prelude::{SmallRng, *};
 use rand_seeder::Seeder;
 use ratatui::prelude::{CrosstermBackend, Terminal};
 
-use crate::{
-    component::{app::AppComponent, Component},
-    error::Result,
-    event::*,
-};
+use crate::event::*;
+use solitaire::ui;
+use solitaire::ui::component::Component;
 
 #[derive(Parser)]
 struct Args {
@@ -27,7 +22,7 @@ struct Args {
     seed: Option<String>,
 }
 
-fn main() -> Result<()> {
+fn main() -> ui::error::Result<()> {
     let args = Args::parse();
 
     let rng = match args.seed.as_deref() {
@@ -44,15 +39,18 @@ fn main() -> Result<()> {
     let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
     terminal.clear()?;
 
-    let mut app = AppComponent::new(&rng);
-    let events = Events::new(std::time::Duration::from_millis(100));
+    let mut app = ui::component::app::AppComponent::new(&rng);
+    let events = Events::new(web_time::Duration::from_millis(100));
 
     loop {
-        terminal.draw(|f| app.render(f, f.size()))?;
+        terminal.draw(|f| app.render(f, f.area()))?;
 
         match events.next()? {
-            Message::Event(Event::KeyPress(KeyCode::Char('q'), _))
-            | Message::Event(Event::KeyPress(KeyCode::Char('c'), KeyModifiers::CONTROL)) => break,
+            Message::Event(ui::event::Event::KeyPress(ui::event::KeyCode::Char('q'), _))
+            | Message::Event(ui::event::Event::KeyPress(
+                ui::event::KeyCode::Char('c'),
+                ui::event::Modifiers { ctrl: true, .. },
+            )) => break,
             Message::Event(event) => {
                 app.handle_event(&event)?;
             }
