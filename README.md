@@ -1,10 +1,11 @@
 # Solitaire
 
 [![CI](https://github.com/bhollier/solitaire/actions/workflows/rust.yml/badge.svg)](https://github.com/bhollier/solitaire/actions/workflows/rust.yml)
+[![Deploy Web](https://github.com/bhollier/solitaire/actions/workflows/pages.yml/badge.svg)](https://github.com/bhollier/solitaire/actions/workflows/pages.yml)
 
 Solitaire in rust 🦀
 
-Playable demo coming soon!
+Play it [here](https://bhollier.github.io/solitaire/)!
 
 ### Terminal UI
 
