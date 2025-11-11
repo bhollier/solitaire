@@ -54,13 +54,13 @@ impl<RNG: rand::Rng> Component for GameComponent<RNG> {
                 self.handle_direction(ui_state::Direction::Right, *m)
             }
             Event::KeyPress(KeyCode::Enter, _) | Event::KeyPress(KeyCode::Char(' '), _) => {
-                self.handle_interact()
+                self.handle_event(ui_state::Event::Interact)
             }
             Event::KeyPress(KeyCode::Char(c @ '1'..='9'), _) => {
-                self.handle_goto(c.to_digit(10).unwrap())
+                self.handle_event(ui_state::Event::Goto(*c as u8))
             }
             Event::KeyPress(KeyCode::Char('c'), _) | Event::KeyPress(KeyCode::Char('C'), _) => {
-                self.handle_cancel()
+                self.handle_event(ui_state::Event::Cancel)
             }
             Event::KeyPress(KeyCode::Char('r'), _) | Event::KeyPress(KeyCode::Char('R'), _) => {
                 self.handle_reset()
@@ -71,7 +71,7 @@ impl<RNG: rand::Rng> Component for GameComponent<RNG> {
     }
 
     fn handle_tick(&mut self, dt: &Duration) -> Result<()> {
-        self.ui_state = self.ui_state.handle_tick(dt, &mut self.state);
+        self.handle_event(ui_state::Event::Tick(*dt))?;
         Ok(())
     }
 
@@ -131,23 +131,7 @@ impl<RNG: rand::Rng> GameComponent<RNG> {
     }
 
     fn handle_direction(&mut self, dir: ui_state::Direction, modifier: Modifiers) -> EventResult {
-        self.ui_state = self.ui_state.handle_direction(dir, modifier, &self.state);
-        Ok(EventState::Consumed)
-    }
-
-    fn handle_interact(&mut self) -> EventResult {
-        self.ui_state = self.ui_state.handle_interact(&mut self.state);
-        Ok(EventState::Consumed)
-    }
-
-    fn handle_goto(&mut self, c: u32) -> EventResult {
-        self.ui_state = self.ui_state.handle_goto(c as u8);
-        Ok(EventState::Consumed)
-    }
-
-    fn handle_cancel(&mut self) -> EventResult {
-        self.ui_state = self.ui_state.handle_cancel();
-        Ok(EventState::Consumed)
+        self.handle_event(ui_state::Event::Direction { dir, modifier })
     }
 
     fn handle_reset(&mut self) -> EventResult {
@@ -163,10 +147,12 @@ impl<RNG: rand::Rng> GameComponent<RNG> {
             .last_render_state
             .as_ref()
             .and_then(|render_state| render_state.find_card_at(col, row))
-            .map(|(_, card_info)| &card_info.location);
-        self.ui_state = self
-            .ui_state
-            .handle_click(&mut self.state, clicked_location);
+            .map(|(_, card_info)| card_info.location);
+        self.handle_event(ui_state::Event::Click(clicked_location))
+    }
+
+    fn handle_event(&mut self, event: ui_state::Event) -> EventResult {
+        self.ui_state = self.ui_state.on(event, &mut self.state);
         Ok(EventState::Consumed)
     }
 }

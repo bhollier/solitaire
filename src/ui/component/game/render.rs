@@ -18,6 +18,7 @@ pub enum CardVisualState {
     Moving,
 }
 
+#[derive(Copy, Clone, Eq, PartialEq)]
 pub enum CardLocation {
     Tableau(usize, usize),
     Foundation(usize),

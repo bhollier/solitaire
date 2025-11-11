@@ -1,6 +1,6 @@
 use crate::ui::error::Error;
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Eq, PartialEq)]
 pub enum KeyCode {
     Char(char),
     F(u8),
@@ -20,21 +20,21 @@ pub enum KeyCode {
     Unknown,
 }
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Eq, PartialEq)]
 pub struct Modifiers {
     pub ctrl: bool,
     pub alt: bool,
     pub shift: bool,
 }
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Eq, PartialEq)]
 pub enum Event {
     KeyPress(KeyCode, Modifiers),
     MousePress(u16, u16, Modifiers),
     Unknown,
 }
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Eq, PartialEq)]
 pub enum EventState {
     Consumed,
     NotConsumed,
